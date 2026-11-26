@@ -7,6 +7,8 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -636,80 +638,142 @@
       <!-- TAB 3: SLIP OCR & EXPENSE RECORDING        -->
       <!-- ========================================== -->
       <section id="view-slips" class="hidden space-y-4">
-        <!-- Top Banner: Why Human Verification + OCR Comparison -->
+        <!-- Live Accounting Sync Banner -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 class="text-base font-bold text-slate-900">ระบบอ่านรูปสลิปธนาคารไทย & บันทึกรายรับ-รายจ่าย</h2>
-              <p class="text-xs text-slate-500">รองรับอ่านค่า EMVCo Mini-QR ร่วมกับ OCR ภาษาไทย พร้อมหน้าจอ "ตรวจและยืนยัน" ก่อนบันทึก และระบบกันสลิปซ้ำอัตโนมัติ</p>
+              <h2 class="text-base font-bold text-slate-900">ระบบสแกนอ่านรูปสลิปธนาคารไทย (QR + AI OCR) & บันทึกรายรับ-รายจ่าย</h2>
+              <p class="text-xs text-slate-500">อัปโหลดรูปสลิปจริงเพื่อสแกน QR และอ่านข้อความภาษาไทยอัตโนมัติ ดูรูปสลิปย้อนหลังได้ทุกใบ และซิงค์ยอดเงินเพิ่ม/หักเข้าหน้างบการเงินทันที</p>
             </div>
             <span class="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
-              กฎความปลอดภัย: ห้ามบันทึกอัตโนมัติโดยไม่มีคนตรวจยืนยัน
+              ซิงค์ยอดเงินเข้า-ออกกับหน้างบการเงินอัตโนมัติ 100%
             </span>
           </div>
 
-          <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div class="flex items-center gap-2 text-indigo-950">
+          <!-- Real-time Sync Summary Strip -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+            <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+              <div class="text-[11px] text-emerald-800 font-medium">รายรับจากสลิปโอนเงินทั้งหมด</div>
+              <div id="slipSyncIncomeText" class="text-base font-bold text-emerald-700 font-num mt-0.5">+฿0.00</div>
+              <div class="text-[10px] text-emerald-600">บวกเพิ่มเข้าหน้างบรายได้ทันที</div>
+            </div>
+            <div class="p-3 rounded-xl bg-rose-50/70 border border-rose-200">
+              <div class="text-[11px] text-rose-800 font-medium">รายจ่ายค่าซื้อสินค้า (ต้นทุน COGS)</div>
+              <div id="slipSyncCogsExpenseText" class="text-base font-bold text-rose-600 font-num mt-0.5">-฿0.00</div>
+              <div class="text-[10px] text-rose-600">หักเป็นต้นทุนสินค้าในงบกำไรขาดทุน</div>
+            </div>
+            <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+              <div class="text-[11px] text-amber-900 font-medium">รายจ่ายดำเนินงาน (เช่า/น้ำไฟ/เงินเดือน/อื่นๆ)</div>
+              <div id="slipSyncOpExpenseText" class="text-base font-bold text-amber-700 font-num mt-0.5">-฿0.00</div>
+              <div class="text-[10px] text-amber-700">หักค่าใช้จ่ายในหน้างบการเงินทันที</div>
+            </div>
+            <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200">
+              <div class="text-[11px] text-indigo-900 font-medium">เงินสด/เงินฝากสุทธิจากสลิป & ขาย</div>
+              <div id="slipSyncNetCashText" class="text-base font-bold text-indigo-700 font-num mt-0.5">฿0.00</div>
+              <div class="text-[10px] text-indigo-600">ซิงค์เข้าช่องเงินสด/เงินฝากในงบดุล</div>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 text-slate-800">
               <i data-lucide="qr-code" class="w-4 h-4 text-indigo-600"></i>
               <span>บัญชีรับเงินหลักของร้าน: <strong>น.ส.มนัสนันท์ ทองรุ่งวิทย์ (ธนาคารกรุงไทย PromptPay)</strong></span>
             </div>
-            <button type="button" onclick="openCompanyQrFullscreenModal()" class="px-3 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-100 transition">
+            <button type="button" onclick="openCompanyQrFullscreenModal()" class="px-3 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50 transition">
               ดูรูป QR บริษัท
             </button>
           </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <!-- Left: Upload / Slip Image Preview & QR Payload -->
+          <!-- Left: Upload / Slip Image Preview & Real OCR/QR Scanner -->
           <div class="lg:col-span-5 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <h3 class="text-sm font-bold text-slate-900">ขั้นตอนที่ 1: อัปโหลดรูปสลิป / ใบเสร็จ (จากมือถือหรือคอม)</h3>
-            <label id="slipUploadDropzone" class="block border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-4 text-center cursor-pointer transition-all duration-300 hover:shadow-md bg-slate-50">
-              <input id="slipFileInput" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onchange="handleSlipFileUpload(event)" class="hidden" />
-              <div class="flex flex-col items-center gap-1.5">
-                <i data-lucide="camera" class="w-7 h-7 text-indigo-600"></i>
-                <span class="text-xs font-semibold text-slate-800">แตะเพื่อถ่ายรูปสลิปจากมือถือ หรือเลือกไฟล์รูปภาพ</span>
-                <span class="text-[11px] text-slate-500">จำกัดเฉพาะไฟล์ JPG, PNG, WEBP ขนาดไม่เกิน 5 MB (เก็บใน Private Storage)</span>
-              </div>
-            </label>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900">ขั้นตอนที่ 1: เลือกรูปสลิปเพื่อสแกนอ่านข้อมูล</h3>
+              <button type="button" onclick="triggerSlipFileDialog()" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                เลือกรูปสลิป / ถ่ายรูป
+              </button>
+            </div>
 
-            <!-- Smooth Upload Progress Bar -->
-            <div id="slipUploadProgressWrapper" class="hidden space-y-1">
-              <div class="flex justify-between text-[11px] font-semibold text-indigo-700">
-                <span id="slipUploadProgressLabel">กำลังอัปโหลดและสแกนสลิป...</span>
-                <span id="slipUploadProgressPct" class="font-num">100%</span>
+            <!-- Explicit Visible File Input & Dropzone -->
+            <div id="slipUploadDropzone"
+                 onclick="triggerSlipFileDialog()"
+                 ondragover="handleSlipDragOver(event)"
+                 ondrop="handleSlipDrop(event)"
+                 class="border-2 border-dashed border-indigo-300 hover:border-indigo-600 rounded-2xl p-4 text-center cursor-pointer transition-all duration-300 hover:shadow-md bg-indigo-50/40 space-y-2">
+              <div class="flex flex-col items-center gap-1.5">
+                <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                  <i data-lucide="scan-line" class="w-6 h-6"></i>
+                </div>
+                <span class="text-xs font-bold text-slate-900">คลิกที่นี่เพื่ออัปโหลดรูปสลิป หรือลากไฟล์รูปมาวาง</span>
+                <span class="text-[11px] text-slate-500">รองรับไฟล์รูปสลิปทุกธนาคาร (JPG, PNG, WEBP) จากมือถือและคอมพิวเตอร์</span>
               </div>
-              <div class="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                <div id="slipUploadProgressBar" class="h-full bg-indigo-600 transition-all duration-500 w-0"></div>
+              <div onclick="event.stopPropagation()" class="pt-1">
+                <input id="slipFileInput" type="file" accept="image/*" onchange="handleSlipFileUpload(event)" class="block w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer" />
+              </div>
+            </div>
+
+            <!-- Smooth Upload & OCR Progress Bar -->
+            <div id="slipUploadProgressWrapper" class="hidden space-y-1 p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+              <div class="flex justify-between text-[11px] font-bold text-indigo-800">
+                <span id="slipUploadProgressLabel">กำลังสแกน QR และอ่านตัวอักษรภาษาไทยจากรูปสลิป...</span>
+                <span id="slipUploadProgressPct" class="font-num">0%</span>
+              </div>
+              <div class="w-full h-2.5 rounded-full bg-indigo-100 overflow-hidden">
+                <div id="slipUploadProgressBar" class="h-full bg-indigo-600 transition-all duration-300 w-0"></div>
               </div>
             </div>
 
             <!-- Rendered Visual Slip Card Preview -->
-            <div id="slipPreviewCard" class="p-4 rounded-xl bg-slate-100 border border-slate-200 text-xs space-y-2">
+            <div id="slipPreviewCard" class="p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs space-y-2.5">
               <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-                <span id="previewBankBadge" class="font-bold text-slate-700">รออัปโหลดรูปสลิปโอนเงิน / ใบเสร็จ</span>
-                <span class="px-2 py-0.5 rounded bg-slate-800 text-white text-[10px]">Private Storage (ต้องล็อกอิน)</span>
+                <span id="previewBankBadge" class="font-bold text-slate-700">ยังไม่ได้อัปโหลดรูปสลิป</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" id="rescanSlipBtn" onclick="rescanCurrentSlipImage()" class="hidden px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-semibold hover:bg-indigo-700">
+                    สแกนซ้ำ
+                  </button>
+                  <button type="button" id="zoomCurrentSlipBtn" onclick="previewCurrentUploadedSlipFullscreen()" class="hidden px-2 py-0.5 rounded bg-slate-800 text-white text-[10px] font-semibold hover:bg-slate-700">
+                    ขยายดูรูปสลิป
+                  </button>
+                </div>
               </div>
-              <div id="UploadedSlipImgWrapper" class="hidden">
-                <img id="uploadedSlipImg" src="" alt="รูปสลิปที่อัปโหลด" class="max-h-48 mx-auto rounded-lg border border-slate-300 object-contain" />
+
+              <div id="UploadedSlipImgWrapper" class="hidden bg-white p-2 rounded-xl border border-slate-200">
+                <img id="uploadedSlipImg" src="" alt="รูปสลิปที่อัปโหลด" onclick="previewCurrentUploadedSlipFullscreen()" class="max-h-64 mx-auto rounded-lg object-contain cursor-zoom-in" title="คลิกเพื่อขยายดูรูปสลิปขนาดใหญ่" />
               </div>
+
               <div class="grid grid-cols-2 gap-1.5 text-[11px]">
-                <div class="text-slate-500">วันที่-เวลาโอน (พ.ศ.):</div>
+                <div class="text-slate-500">วันที่-เวลาที่สแกนได้:</div>
                 <div id="previewDateText" class="font-num font-semibold text-right">-</div>
-                <div class="text-slate-500">เลขอ้างอิง (Ref):</div>
+                <div class="text-slate-500">เลขอ้างอิง (จาก QR/OCR):</div>
                 <div id="previewRefText" class="font-num font-semibold text-right break-all">-</div>
-                <div class="text-slate-500">ยอดเงินที่อ่านได้:</div>
+                <div class="text-slate-500">จำนวนเงินที่สแกนได้:</div>
                 <div id="previewAmountText" class="font-num font-bold text-indigo-700 text-right text-sm">฿0.00</div>
               </div>
+
               <div class="pt-1 border-t border-slate-200 text-[10px] text-slate-500 font-num break-all">
-                <strong>EMVCo Mini-QR Payload:</strong> <span id="previewQrPayloadText">-</span>
+                <strong>สถานะ Mini-QR:</strong> <span id="previewQrPayloadText">รอสแกนรูปสลิป</span>
+              </div>
+
+              <!-- Raw OCR Detected Lines Helper (Click to autofill) -->
+              <div id="ocrRawHelperBox" class="hidden pt-2 border-t border-slate-200 space-y-1.5">
+                <div class="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                  <span>ข้อความที่อ่านได้จากสลิป (คลิกเพื่อนำไปใส่ช่องข้อมูล):</span>
+                  <span class="text-[10px] text-slate-500">Tesseract Thai OCR</span>
+                </div>
+                <div id="ocrDetectedLinesList" class="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1.5 rounded-lg bg-white border border-slate-200"></div>
               </div>
             </div>
           </div>
 
           <!-- Right: Human-in-the-loop Verification & Edit Form -->
           <div class="lg:col-span-7 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-bold text-slate-900">ขั้นตอนที่ 2: หน้าจอ "ตรวจและยืนยันข้อมูลสลิป" ก่อนบันทึก</h3>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">ขั้นตอนที่ 2: ตรวจทาน/แก้ไขข้อมูลสลิป และกดบันทึกเข้างบการเงิน</h3>
+                <p class="text-[11px] text-slate-500">หากสลิปมีลายน้ำจนอ่านชื่อหรือตัวเลขคลาดเคลื่อน คุณสามารถพิมพ์แก้ไขได้ทุกช่องก่อนกดบันทึก</p>
+              </div>
               <span id="slipDuplicateAlertBadge" class="hidden px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-bold">
                 ตรวจพบสลิปซ้ำในระบบ!
               </span>
@@ -720,112 +784,118 @@
                 <i data-lucide="octagon-alert" class="w-4 h-4 text-rose-600"></i>
                 <span>ระบบบล็อกอัตโนมัติ: สลิปนี้เคยบันทึกไปแล้ว!</span>
               </div>
-              <p>ตรวจพบ เลขอ้างอิงรายการ + จำนวนเงิน + เวลา ตรงกับรายการที่มีอยู่ในระบบแล้ว เพื่อป้องกันพนักงานนำสลิปเดิมมาวนซ้ำ</p>
+              <p>ตรวจพบ เลขอ้างอิงรายการ + จำนวนเงิน + เวลา ตรงกับรายการที่มีอยู่ในระบบแล้ว เพื่อป้องกันการบันทึกซ้ำ</p>
             </div>
 
             <form id="slipVerifyForm" onsubmit="handleConfirmSaveSlip(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label class="block font-medium text-slate-700 mb-1" for="slipTypeSelect">ประเภทรายการ</label>
-                <select id="slipTypeSelect" onchange="handleSlipTypeChange()" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                  <option value="INCOME_SLIP">รายรับ (สลิปโอนจากลูกค้า)</option>
-                  <option value="EXPENSE_SLIP">รายจ่ายร้าน (ใบเสร็จ/สลิปโอนจ่าย)</option>
+                <label class="block font-bold text-slate-700 mb-1" for="slipTypeSelect">ประเภทรายการ (ผลต่อหน้างบการเงิน)</label>
+                <select id="slipTypeSelect" onchange="handleSlipTypeChange()" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold">
+                  <option value="INCOME_SLIP">รายรับ (+ เพิ่มรายได้และเงินสดในงบการเงิน)</option>
+                  <option value="EXPENSE_SLIP">รายจ่าย (- หักค่าใช้จ่าย/ต้นทุนและหักเงินสดในงบ)</option>
                 </select>
               </div>
 
               <div>
-                <label class="block font-medium text-slate-700 mb-1" for="slipCategorySelect">หมวดหมู่บัญชี / ผูกบิลขาย</label>
-                <select id="slipCategorySelect" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                  <option value="ยอดขายหน้าร้าน">ยอดขายหน้าร้าน (ผูกบิลขาย)</option>
-                  <option value="ค่าสินค้า">ค่าซื้อสินค้าเข้าสต็อก</option>
-                  <option value="ค่าเช่า">ค่าเช่าสถานที่</option>
-                  <option value="ค่าน้ำไฟ">ค่าน้ำประปา / ค่าไฟฟ้า / อินเทอร์เน็ต</option>
-                  <option value="เงินเดือน">เงินเดือนและค่าแรงพนักงาน</option>
-                  <option value="อื่นๆ">ค่าใช้จ่ายเบ็ดเตล็ดอื่นๆ</option>
+                <label class="block font-bold text-slate-700 mb-1" for="slipCategorySelect">หมวดหมู่บัญชี</label>
+                <select id="slipCategorySelect" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold">
+                  <option value="ยอดขายหน้าร้าน">ยอดขายหน้าร้าน / รายรับโอนจากลูกค้า (+รายได้)</option>
+                  <option value="ค่าสินค้า">ค่าซื้อสินค้าเข้าสต็อก (-หักต้นทุนขาย COGS)</option>
+                  <option value="ค่าเช่า">ค่าเช่าสถานที่ (-หักค่าใช้จ่ายดำเนินงาน)</option>
+                  <option value="ค่าน้ำไฟ">ค่าน้ำประปา / ค่าไฟฟ้า / เน็ต (-หักค่าใช้จ่ายดำเนินงาน)</option>
+                  <option value="เงินเดือน">เงินเดือนและค่าแรงพนักงาน (-หักค่าใช้จ่ายดำเนินงาน)</option>
+                  <option value="อื่นๆ">ค่าใช้จ่ายเบ็ดเตล็ดอื่นๆ (-หักค่าใช้จ่ายดำเนินงาน)</option>
                 </select>
               </div>
 
               <div>
-                <label class="block font-medium text-slate-700 mb-1" for="slipBankSelect">ธนาคารที่อ่านได้</label>
+                <label class="block font-medium text-slate-700 mb-1" for="slipBankSelect">ธนาคารบนสลิป</label>
                 <select id="slipBankSelect" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                  <option value="006">ธนาคารกรุงไทย (KTB - 006)</option>
                   <option value="004">ธนาคารกสิกรไทย (KBANK - 004)</option>
                   <option value="014">ธนาคารไทยพาณิชย์ (SCB - 014)</option>
                   <option value="002">ธนาคารกรุงเทพ (BBL - 002)</option>
-                  <option value="006">ธนาคารกรุงไทย (KTB - 006)</option>
                   <option value="011">ธนาคารทหารไทยธนชาต (ttb - 011)</option>
                   <option value="025">ธนาคารกรุงศรีอยุธยา (BAY - 025)</option>
+                  <option value="030">ธนาคารออมสิน (GSB - 030)</option>
+                  <option value="999">ธนาคารอื่นๆ / บิลเงินสด</option>
                 </select>
               </div>
 
               <div>
                 <label class="block font-medium text-slate-700 mb-1" for="slipRefInput">เลขอ้างอิงรายการ (Trans Ref)</label>
-                <input id="slipRefInput" type="text" required oninput="checkCurrentSlipDuplicateLive()" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num" />
+                <input id="slipRefInput" type="text" required oninput="checkCurrentSlipDuplicateLive()" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num" placeholder="สแกนจาก QR อัตโนมัติ หรือพิมพ์เลขอ้างอิง" />
               </div>
 
               <div>
-                <label class="block font-medium text-slate-700 mb-1" for="slipDateBEInput">วันที่โอน (รูปแบบ พ.ศ. วว/ดด/ปปปป)</label>
-                <input id="slipDateBEInput" type="text" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num" placeholder="เช่น 20/11/2569" />
+                <label class="block font-medium text-slate-700 mb-1" for="slipDateBEInput">วันที่บนสลิป (พ.ศ. วว/ดด/ปปปป)</label>
+                <input id="slipDateBEInput" type="text" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num" placeholder="เช่น 26/11/2569" />
               </div>
 
               <div>
                 <label class="block font-medium text-slate-700 mb-1" for="slipTimeInput">เวลาบนสลิป (นน:นน)</label>
-                <input id="slipTimeInput" type="text" required oninput="checkCurrentSlipDuplicateLive()" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num" placeholder="เช่น 10:42" />
+                <input id="slipTimeInput" type="text" required oninput="checkCurrentSlipDuplicateLive()" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num" placeholder="เช่น 14:35" />
               </div>
 
               <div>
-                <label class="block font-medium text-slate-700 mb-1" for="slipAmountInput">จำนวนเงิน (บาท)</label>
-                <input id="slipAmountInput" type="number" step="0.01" min="0.01" required oninput="checkCurrentSlipDuplicateLive()" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num font-bold text-indigo-700" />
+                <label class="block font-bold text-indigo-700 mb-1" for="slipAmountInput">จำนวนเงินบนสลิป (บาท) *</label>
+                <input id="slipAmountInput" type="number" step="0.01" min="0.01" required oninput="checkCurrentSlipDuplicateLive()" class="w-full px-3 py-2 rounded-xl border-2 border-indigo-300 focus:border-indigo-600 font-num font-bold text-base text-indigo-700" placeholder="0.00" />
               </div>
 
               <div>
-                <label class="block font-medium text-slate-700 mb-1" for="slipLinkSaleSelect">ผูกกับบิลขายหน้าร้าน (กรณีลูกค้าโอน)</label>
+                <label class="block font-medium text-slate-700 mb-1" for="slipLinkSaleSelect">ผูกกับบิลขายหน้าร้าน (ถ้ามี)</label>
                 <select id="slipLinkSaleSelect" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white"></select>
               </div>
 
               <div>
                 <label class="block font-medium text-slate-700 mb-1" for="slipSenderInput">ชื่อผู้โอน</label>
-                <input id="slipSenderInput" type="text" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+                <input id="slipSenderInput" type="text" required class="w-full px-3 py-2 rounded-xl border border-slate-300" placeholder="ชื่อผู้โอนบนสลิป" />
               </div>
 
               <div>
                 <label class="block font-medium text-slate-700 mb-1" for="slipReceiverInput">ชื่อผู้รับเงิน</label>
-                <input id="slipReceiverInput" type="text" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+                <input id="slipReceiverInput" type="text" required class="w-full px-3 py-2 rounded-xl border border-slate-300" placeholder="ชื่อผู้รับบนสลิป" />
               </div>
 
               <div class="sm:col-span-2 pt-1">
                 <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
                   <input id="humanVerifiedCheckbox" type="checkbox" required class="rounded text-indigo-600 focus:ring-indigo-500" />
-                  <span>ข้าพเจ้าได้ตรวจสอบรูปสลิปเทียบกับตัวเลขด้านบนแล้วว่าถูกต้องทุกประการ (Human-in-the-Loop Verification)</span>
+                  <span>ข้าพเจ้าได้ตรวจสอบรูปสลิปเทียบกับเวลา จำนวนเงิน และชื่อด้านบนแล้วว่าถูกต้อง (Human-in-the-Loop Verification)</span>
                 </label>
               </div>
 
               <div class="sm:col-span-2">
-                <button type="submit" id="saveSlipSubmitBtn" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center justify-center gap-2">
+                <button type="submit" id="saveSlipSubmitBtn" class="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2">
                   <i data-lucide="save" class="w-4 h-4"></i>
-                  ยืนยันความถูกต้องและบันทึกรายการสลิปเข้าสู่ระบบบัญชี
+                  ยืนยันบันทึกสลิป & ซิงค์ยอดเงินเข้าหน้างบการเงินทันที
                 </button>
               </div>
             </form>
           </div>
         </div>
 
-        <!-- Recorded Slips & Expenses Table -->
+        <!-- Recorded Slips & Expenses Table with Image Viewer -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-2.5">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-bold text-slate-900">รายการสลิปโอนเงินและค่าใช้จ่ายที่ผ่านการตรวจยืนยันแล้ว</h3>
-            <span class="text-xs text-slate-500">ทุกการแก้ไขจะถูกบันทึกไว้ใน Audit Log</span>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">รายการสลิปและรายรับ-รายจ่ายที่บันทึกแล้ว (คลิก "ดูรูปสลิป" เพื่อเปิดดูภาพต้นฉบับได้ทุกใบ)</h3>
+              <p class="text-xs text-slate-500">ทุกรายการในตารางนี้ถูกนำไปคำนวณในแท็บ "4. งบการเงิน & อัตราส่วน 12 ตัว" อัตโนมัติ</p>
+            </div>
+            <span id="slipsTotalCountBadge" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-num font-semibold">0 รายการ</span>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-100 text-slate-700 border-b border-slate-200">
                 <tr>
-                  <th class="py-2 px-2.5">วัน-เวลาโอน (พ.ศ.)</th>
-                  <th class="py-2 px-2.5">ประเภท / หมวดหมู่</th>
-                  <th class="py-2 px-2.5">ธนาคาร</th>
-                  <th class="py-2 px-2.5">เลขอ้างอิง (Ref)</th>
-                  <th class="py-2 px-2.5">ผู้โอน → ผู้รับ</th>
-                  <th class="py-2 px-2.5">ผูกบิลขาย</th>
-                  <th class="py-2 px-2.5 text-right">จำนวนเงิน</th>
-                  <th class="py-2 px-2.5">ผู้ตรวจยืนยัน</th>
+                  <th class="py-2.5 px-2.5">รูปสลิป</th>
+                  <th class="py-2.5 px-2.5">วัน-เวลาโอน (พ.ศ.)</th>
+                  <th class="py-2.5 px-2.5">ประเภท / หมวดหมู่</th>
+                  <th class="py-2.5 px-2.5">ธนาคาร</th>
+                  <th class="py-2.5 px-2.5">เลขอ้างอิง (Ref)</th>
+                  <th class="py-2.5 px-2.5">ผู้โอน → ผู้รับ</th>
+                  <th class="py-2.5 px-2.5">ผูกบิลขาย</th>
+                  <th class="py-2.5 px-2.5 text-right">จำนวนเงิน</th>
+                  <th class="py-2.5 px-2.5 text-center">ดูสลิป / จัดการ</th>
                 </tr>
               </thead>
               <tbody id="slipsHistoryBody" class="divide-y divide-slate-100"></tbody>
@@ -850,9 +920,10 @@
 
           <div class="flex flex-wrap items-center gap-2">
             <select id="financePeriodSelect" onchange="renderFinanceDashboard()" class="px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white">
-              <option value="2569-11">รายเดือน: พฤศจิกายน 2569 (เดือนปัจจุบัน)</option>
-              <option value="2569-10">รายเดือน: ตุลาคม 2569 (เดือนก่อน)</option>
-              <option value="2569-09">รายเดือน: กันยายน 2569 (ทดสอบยังไม่กรอกงบดุล!)</option>
+              <option value="ALL_TIME" selected>ทั้งหมด (ซิงค์บิลขาย + สลิปรายรับ/รายจ่ายทุกใบแบบ Realtime)</option>
+              <option value="2569-11">รายเดือน: พฤศจิกายน 2569</option>
+              <option value="2569-10">รายเดือน: ตุลาคม 2569</option>
+              <option value="2569-09">รายเดือน: กันยายน 2569</option>
               <option value="Q4-2569">รายไตรมาส: ไตรมาส 4/2569 (ก.ย.-พ.ย. 2569)</option>
               <option value="YEAR-2569">รายปี: สรุปทั้งปี พ.ศ. 2569</option>
             </select>
@@ -894,6 +965,18 @@
             <div id="finCardNetProfit" class="text-lg font-bold text-emerald-700 font-num mt-1">฿0.00</div>
             <div class="text-[11px] text-emerald-600 mt-0.5">กำไรหลังหักค่าใช้จ่ายทุกตัว</div>
           </div>
+        </div>
+
+        <!-- Synced Revenue & Expense Breakdown from POS + Slips -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2.5 text-xs">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600"></i>
+              <span>รายละเอียดการซิงค์ข้อมูลจาก "หน้าขาย POS" และ "หน้าอ่านสลิปโอนเงิน & รายจ่าย"</span>
+            </h3>
+            <span id="finSyncSummaryTag" class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">ซิงค์ข้อมูลล่าสุดแล้ว</span>
+          </div>
+          <div id="finSyncBreakdownContent" class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1"></div>
         </div>
 
         <!-- Simple Monthly Balance Sheet Form & Toggle -->
@@ -2423,6 +2506,9 @@
       };
 
       state.sales.unshift(newSale);
+      if (state.balanceSheets['2569-11']) {
+        state.balanceSheets['2569-11'].cashAndBank = round2(Number(state.balanceSheets['2569-11'].cashAndBank || 0) + newSale.grandTotal);
+      }
       addAuditLog('POS_SALE_COMPLETED', nextReceiptNo, `ยอดสุทธิ ${formatCurrency(newSale.grandTotal)} (${newSale.paymentMethod}) ต้นทุน FIFO ${formatCurrency(newSale.totalCogs)}`);
       clearCart();
       refreshAllViews();
@@ -2787,100 +2873,10 @@
     }
 
     // =========================================================================
-    // 7. SLIP OCR & QR READER + DUPLICATE SLIP PROTECTION
+    // 7. REAL SLIP QR + AI OCR SCANNER, IMAGE VIEWER & DUPLICATE PROTECTION
     // =========================================================================
-    const sampleBankSlips = {
-      KBANK_SALE: {
-        type: 'INCOME_SLIP',
-        category: 'ยอดขายหน้าร้าน',
-        bankCode: '004',
-        bankDisplay: 'ธนาคารกสิกรไทย (K PLUS)',
-        qrPayload: '00410006000001010300402180042569112010429915102TH91048F2A',
-        dateBE: '20/11/2569',
-        time: '10:42',
-        amount: 175.00,
-        sender: 'นาย กิตติพงศ์ ลูกค้าประจำ',
-        receiver: 'บจก. สยามมินิมาร์ท',
-        linkedSaleReceipt: 'INV-256911-002'
-      },
-      SCB_RENT: {
-        type: 'EXPENSE_SLIP',
-        category: 'ค่าเช่า',
-        bankCode: '014',
-        bankDisplay: 'ธนาคารไทยพาณิชย์ (SCB EASY)',
-        qrPayload: '00410006000001010301402180142569112011154425102TH9104C11B',
-        dateBE: '20/11/2569',
-        time: '11:15',
-        amount: 8500.00,
-        sender: 'บจก. สยามมินิมาร์ท',
-        receiver: 'นาย สมบัติ เจ้าของอาคารพาณิชย์',
-        linkedSaleReceipt: ''
-      },
-      BBL_UTILITY: {
-        type: 'EXPENSE_SLIP',
-        category: 'ค่าน้ำไฟ',
-        bankCode: '002',
-        bankDisplay: 'ธนาคารกรุงเทพ (BBL Mobile)',
-        qrPayload: '00410006000001010300202180022569112015207745102TH9104E49C',
-        dateBE: '20/11/2569',
-        time: '15:20',
-        amount: 2450.00,
-        sender: 'บจก. สยามมินิมาร์ท',
-        receiver: 'การประปาและไฟฟ้านครหลวง',
-        linkedSaleReceipt: ''
-      },
-      KTB_DUPLICATE: {
-        type: 'EXPENSE_SLIP',
-        category: 'ค่าน้ำไฟ',
-        bankCode: '006',
-        bankDisplay: 'ธนาคารกรุงไทย (Krungthai NEXT)',
-        qrPayload: '00410006000001010300602180062569111013305555102TH9104A01D',
-        dateBE: '10/11/2569',
-        time: '13:30',
-        amount: 3200.00,
-        sender: 'บจก. สยามมินิมาร์ท',
-        receiver: 'การไฟฟ้านครหลวง (MEA)',
-        linkedSaleReceipt: ''
-      }
-    };
-
-    function populateSlipSaleLinkDropdown() {
-      const sel = document.getElementById('slipLinkSaleSelect');
-      if (!sel) return;
-      sel.innerHTML = `<option value="">-- ไม่ผูกบิลขาย (หรือเป็นรายจ่ายร้าน) --</option>` +
-        state.sales.map(s => `<option value="${s.receiptNo}">${s.receiptNo} (${formatCurrency(s.grandTotal)} - ${s.paymentMethod})</option>`).join('');
-    }
-
-    function loadSampleBankSlip(key) {
-      const s = sampleBankSlips[key];
-      if (!s) return;
-
-      // ถอดรหัส Mini-QR บนสลิปด้วยฟังก์ชัน parseThaiSlipMiniQR จริง
-      const decodedQr = parseThaiSlipMiniQR(s.qrPayload);
-      const transRef = decodedQr ? decodedQr.transRef : 'REF-UNKNOWN';
-
-      document.getElementById('UploadedSlipImgWrapper').classList.add('hidden');
-      document.getElementById('previewBankBadge').textContent = s.bankDisplay;
-      document.getElementById('previewDateText').textContent = `${s.dateBE} ${s.time}`;
-      document.getElementById('previewRefText').textContent = transRef;
-      document.getElementById('previewAmountText').textContent = formatCurrency(s.amount);
-      document.getElementById('previewQrPayloadText').textContent = s.qrPayload;
-
-      document.getElementById('slipTypeSelect').value = s.type;
-      document.getElementById('slipCategorySelect').value = s.category;
-      document.getElementById('slipBankSelect').value = s.bankCode;
-      document.getElementById('slipRefInput').value = transRef;
-      document.getElementById('slipDateBEInput').value = s.dateBE;
-      document.getElementById('slipTimeInput').value = s.time;
-      document.getElementById('slipAmountInput').value = s.amount;
-      document.getElementById('slipSenderInput').value = s.sender;
-      document.getElementById('slipReceiverInput').value = s.receiver;
-      document.getElementById('slipLinkSaleSelect').value = s.linkedSaleReceipt;
-      document.getElementById('humanVerifiedCheckbox').checked = false;
-
-      checkCurrentSlipDuplicateLive();
-      showToast(`อ่านข้อมูลสลิป "${s.bankDisplay}" สำเร็จ กรุณาตรวจสอบข้อมูลก่อนกดยืนยันบันทึก`, 'info');
-    }
+    let currentUploadedSlipDataUrl = '';
+    let lastExtractedOcrTokens = [];
 
     function setProductImagePreviewData(dataUrl) {
       const hiddenInput = document.getElementById('prodImageDataInput');
@@ -2949,59 +2945,490 @@
       reader.readAsDataURL(file);
     }
 
+    function triggerSlipFileDialog() {
+      const inp = document.getElementById('slipFileInput');
+      if (inp) inp.click();
+    }
+
+    function handleSlipDragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    function handleSlipDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        processSlipImageFile(files[0]);
+      }
+    }
+
+    function populateSlipSaleLinkDropdown() {
+      const sel = document.getElementById('slipLinkSaleSelect');
+      if (!sel) return;
+      sel.innerHTML = `<option value="">-- ไม่ผูกบิลขาย (นับเป็นรายรับ/รายจ่ายโดยตรง) --</option>` +
+        state.sales.map(s => `<option value="${s.receiptNo}">${s.receiptNo} (${formatCurrency(s.grandTotal)} - ${s.paymentMethod})</option>`).join('');
+    }
+
+    function loadSampleBankSlip(key) {
+      // Kept for backward compatibility
+    }
+
     function handleSlipFileUpload(e) {
       const file = e.target.files?.[0];
       if (!file) return;
+      processSlipImageFile(file);
+    }
+
+    function setSlipScanProgress(visible, labelText, pct) {
+      const wrap = document.getElementById('slipUploadProgressWrapper');
+      const label = document.getElementById('slipUploadProgressLabel');
+      const pctEl = document.getElementById('slipUploadProgressPct');
+      const bar = document.getElementById('slipUploadProgressBar');
+      if (!wrap) return;
+      if (!visible) {
+        wrap.classList.add('hidden');
+        return;
+      }
+      wrap.classList.remove('hidden');
+      if (label) label.textContent = labelText;
+      if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+      if (bar) bar.style.width = `${Math.min(100, Math.max(5, Math.round(pct)))}%`;
+    }
+
+    function decodeQrFromImageElement(img) {
+      if (!window.jsQR) return null;
+      const regions = [
+        { sx: 0, sy: 0, sw: 1, sh: 1 },
+        { sx: 0.4, sy: 0.45, sw: 0.6, sh: 0.55 },
+        { sx: 0, sy: 0.5, sw: 1, sh: 0.5 },
+        { sx: 0.45, sy: 0.25, sw: 0.55, sh: 0.75 }
+      ];
+      const scales = [1, 1.5];
+
+      for (const reg of regions) {
+        for (const sc of scales) {
+          const canvas = document.createElement('canvas');
+          const cw = Math.max(120, Math.round(img.width * reg.sw * sc));
+          const ch = Math.max(120, Math.round(img.height * reg.sh * sc));
+          canvas.width = cw;
+          canvas.height = ch;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(
+            img,
+            img.width * reg.sx,
+            img.height * reg.sy,
+            img.width * reg.sw,
+            img.height * reg.sh,
+            0,
+            0,
+            cw,
+            ch
+          );
+          const imgData = ctx.getImageData(0, 0, cw, ch);
+          const code = window.jsQR(imgData.data, cw, ch, { inversionAttempts: 'attemptBoth' });
+          if (code && code.data) {
+            return code.data;
+          }
+        }
+      }
+      return null;
+    }
+
+    function parseThaiSlipOcrText(rawText, qrPayload) {
+      const text = (rawText || '').replace(/\r/g, '\n');
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const parsedQr = qrPayload ? parseThaiSlipMiniQR(qrPayload) : null;
+
+      let bankCode = parsedQr ? parsedQr.bankCode : null;
+      const lowerText = text.toLowerCase();
+      if (!bankCode) {
+        if (/กสิกร|kbank|k\s*plus|kasikorn/i.test(lowerText)) bankCode = '004';
+        else if (/ไทยพาณิชย์|scb/i.test(lowerText)) bankCode = '014';
+        else if (/กรุงไทย|krungthai|ktb|next/i.test(lowerText)) bankCode = '006';
+        else if (/กรุงเทพ|bangkok\s*bank|bbl/i.test(lowerText)) bankCode = '002';
+        else if (/ทหารไทย|ธนชาต|ttb/i.test(lowerText)) bankCode = '011';
+        else if (/กรุงศรี|krungsri|bay/i.test(lowerText)) bankCode = '025';
+        else if (/ออมสิน|gsb|mymo/i.test(lowerText)) bankCode = '030';
+      }
+
+      let detectedTime = '';
+      const strictColonTime = text.match(/([01]?\d|2[0-3]):([0-5]\d)/);
+      const thaiNoiTime = text.match(/([01]?\d|2[0-3])[:.]([0-5]\d)\s*น/);
+      if (strictColonTime) {
+        detectedTime = `${strictColonTime[1].padStart(2, '0')}:${strictColonTime[2]}`;
+      } else if (thaiNoiTime) {
+        detectedTime = `${thaiNoiTime[1].padStart(2, '0')}:${thaiNoiTime[2]}`;
+      }
+
+      let detectedDateBE = '';
+      const thaiMonths = {
+        'ม.ค': '01', 'มค': '01', 'มกราคม': '01', 'jan': '01',
+        'ก.พ': '02', 'กพ': '02', 'กุมภาพันธ์': '02', 'feb': '02',
+        'มี.ค': '03', 'มีค': '03', 'มีนาคม': '03', 'mar': '03',
+        'เม.ย': '04', 'เมย': '04', 'เมษายน': '04', 'apr': '04',
+        'พ.ค': '05', 'พค': '05', 'พฤษภาคม': '05', 'may': '05',
+        'มิ.ย': '06', 'มิย': '06', 'มิถุนายน': '06', 'jun': '06',
+        'ก.ค': '07', 'กค': '07', 'กรกฎาคม': '07', 'jul': '07',
+        'ส.ค': '08', 'สค': '08', 'สิงหาคม': '08', 'aug': '08',
+        'ก.ย': '09', 'กย': '09', 'กันยายน': '09', 'sep': '09',
+        'ต.ค': '10', 'ตค': '10', 'ตุลาคม': '10', 'oct': '10',
+        'พ.ย': '11', 'พย': '11', 'พฤศจิกายน': '11', 'nov': '11',
+        'ธ.ค': '12', 'ธค': '12', 'ธันวาคม': '12', 'dec': '12'
+      };
+
+      const monthPattern = /(?:(\d{1,2})\s*(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z.]*\s*(\d{2,4}))/i;
+      const mMatch = text.match(monthPattern);
+      if (mMatch) {
+        const dd = mMatch[1].padStart(2, '0');
+        const rawM = mMatch[2].replace(/\.$/g, '').toLowerCase();
+        const mm = thaiMonths[rawM] || thaiMonths[rawM.replace(/\./g, '')] || '11';
+        let yyyy = parseInt(mMatch[3], 10);
+        if (yyyy < 100) {
+          yyyy = yyyy >= 60 ? 2500 + yyyy : 2000 + yyyy + 543;
+        } else if (yyyy < 2400) {
+          yyyy += 543;
+        }
+        detectedDateBE = `${dd}/${mm}/${yyyy}`;
+      } else {
+        const slashDate = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+        if (slashDate) {
+          const dd = slashDate[1].padStart(2, '0');
+          const mm = slashDate[2].padStart(2, '0');
+          let yyyy = parseInt(slashDate[3], 10);
+          if (yyyy < 100) yyyy = yyyy >= 60 ? 2500 + yyyy : 2000 + yyyy + 543;
+          else if (yyyy < 2400) yyyy += 543;
+          detectedDateBE = `${dd}/${mm}/${yyyy}`;
+        }
+      }
+
+      let detectedAmount = null;
+      const amountCandidates = [];
+      for (const line of lines) {
+        if (/ค่าธรรมเนียม|fee/i.test(line)) continue;
+        const isPriorityLine = /จำนวน|amount|บาท|thb|ยอดโอน|รวมเงิน/i.test(line);
+        const matches = [...line.matchAll(/(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})\b/g)];
+        for (const m of matches) {
+          const val = parseFloat(m[0].replace(/,/g, ''));
+          if (val > 0 && val < 10000000) {
+            amountCandidates.push({ val, priority: isPriorityLine ? 2 : 1 });
+          }
+        }
+      }
+      if (amountCandidates.length > 0) {
+        amountCandidates.sort((a, b) => b.priority - a.priority || b.val - a.val);
+        detectedAmount = amountCandidates[0].val;
+      }
+
+      let detectedRef = parsedQr ? parsedQr.transRef : '';
+      if (!detectedRef) {
+        const refMatch = text.match(/(?:รหัสอ้างอิง|เลขที่รายการ|เลขอ้างอิง|ref\.?|รหัสรายการ)[:\s]*([A-Za-z0-9]{10,25})/i);
+        if (refMatch) {
+          detectedRef = refMatch[1];
+        } else {
+          const longToken = text.match(/\b(\d{14,25}|[0-9A-Za-z]{16,25})\b/);
+          if (longToken) detectedRef = longToken[1];
+        }
+      }
+
+      let detectedSender = '';
+      let detectedReceiver = '';
+      const namePattern = /(?:นาย|นางสาว|น\.ส\.|นาง|คุณ|บจก\.|หจก\.|ร้าน|mr\.?|ms\.?|mrs\.?)\s*[ก-๙A-Za-z]+(?:\s+[ก-๙A-Za-z.]+)?/i;
+      const nameLines = [];
+      for (const line of lines) {
+        const clean = line.replace(/^[^\u0E00-\u0E7FA-Za-z]+/, '').trim();
+        if (namePattern.test(clean)) {
+          const m = clean.match(namePattern);
+          if (m) nameLines.push(m[0].trim());
+        } else if (/มนัสนันท์|ทองรุ่งวิทย์/.test(clean)) {
+          nameLines.push('น.ส.มนัสนันท์ ทองรุ่งวิทย์');
+        }
+      }
+      if (nameLines.length >= 2) {
+        detectedSender = nameLines[0];
+        detectedReceiver = nameLines[1];
+      } else if (nameLines.length === 1) {
+        if (/มนัสนันท์/.test(nameLines[0])) {
+          detectedReceiver = 'น.ส.มนัสนันท์ ทองรุ่งวิทย์';
+        } else {
+          detectedSender = nameLines[0];
+        }
+      }
+
+      return {
+        bankCode,
+        transRef: detectedRef,
+        dateBE: detectedDateBE,
+        time: detectedTime,
+        amount: detectedAmount,
+        sender: detectedSender,
+        receiver: detectedReceiver,
+        lines
+      };
+    }
+
+    function renderOcrHelperChips(lines) {
+      lastExtractedOcrTokens = lines || [];
+      const box = document.getElementById('ocrRawHelperBox');
+      const list = document.getElementById('ocrDetectedLinesList');
+      if (!box || !list) return;
+      if (!lines || lines.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+      box.classList.remove('hidden');
+      list.innerHTML = lines.slice(0, 18).map((line, idx) => {
+        const safeText = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `
+          <div class="inline-flex items-center gap-1 bg-slate-100 hover:bg-indigo-50 border border-slate-200 rounded-lg px-2 py-1 text-[10px]">
+            <span class="font-medium text-slate-800 truncate max-w-[160px]" title="${safeText}">${safeText}</span>
+            <button type="button" onclick="applyOcrTokenToField(${idx}, 'sender')" class="px-1 rounded bg-white text-indigo-700 hover:bg-indigo-600 hover:text-white font-bold" title="ใส่เป็นชื่อผู้โอน">ผู้โอน</button>
+            <button type="button" onclick="applyOcrTokenToField(${idx}, 'receiver')" class="px-1 rounded bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white font-bold" title="ใส่เป็นชื่อผู้รับ">ผู้รับ</button>
+            <button type="button" onclick="applyOcrTokenToField(${idx}, 'amount')" class="px-1 rounded bg-white text-amber-700 hover:bg-amber-600 hover:text-white font-bold" title="ดึงตัวเลขใส่ยอดเงิน">ยอดเงิน</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function applyOcrTokenToField(idx, fieldType) {
+      const text = lastExtractedOcrTokens[idx];
+      if (!text) return;
+      if (fieldType === 'sender') {
+        document.getElementById('slipSenderInput').value = text;
+        showToast(`นำ "${text}" ใส่ช่องชื่อผู้โอนแล้ว`, 'info');
+      } else if (fieldType === 'receiver') {
+        document.getElementById('slipReceiverInput').value = text;
+        showToast(`นำ "${text}" ใส่ช่องชื่อผู้รับแล้ว`, 'info');
+      } else if (fieldType === 'amount') {
+        const numMatch = text.match(/(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?/);
+        if (numMatch) {
+          const val = parseFloat(numMatch[0].replace(/,/g, ''));
+          document.getElementById('slipAmountInput').value = val;
+          document.getElementById('previewAmountText').textContent = formatCurrency(val);
+          checkCurrentSlipDuplicateLive();
+          showToast(`นำยอดเงิน ${formatCurrency(val)} ใส่ช่องจำนวนเงินแล้ว`, 'info');
+        }
+      }
+    }
+
+    async function processSlipImageFile(file) {
       const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!allowed.includes(file.type)) {
+      if (file.type && !allowed.includes(file.type)) {
         showToast('รองรับเฉพาะไฟล์รูปภาพ JPG, PNG หรือ WEBP เท่านั้น', 'error');
-        e.target.value = '';
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        showToast('ขนาดไฟล์รูปสลิปต้องไม่เกิน 5 MB', 'error');
-        e.target.value = '';
+      if (file.size > 8 * 1024 * 1024) {
+        showToast('ขนาดไฟล์รูปสลิปต้องไม่เกิน 8 MB', 'error');
         return;
       }
+
+      setSlipScanProgress(true, 'กำลังโหลดรูปสลิปและสแกน Mini-QR...', 15);
 
       const reader = new FileReader();
       reader.onload = function(evt) {
-        const progWrap = document.getElementById('slipUploadProgressWrapper');
-        const progBar = document.getElementById('slipUploadProgressBar');
-        const cardEl = document.getElementById('slipPreviewCard');
-        if (progWrap && progBar) {
-          progWrap.classList.remove('hidden');
-          progBar.style.width = '30%';
-          setTimeout(() => { progBar.style.width = '100%'; }, 80);
-          setTimeout(() => { progWrap.classList.add('hidden'); progBar.style.width = '0%'; }, 900);
-        }
-        if (cardEl) {
-          cardEl.classList.remove('upload-animate-pop');
-          void cardEl.offsetWidth;
-          cardEl.classList.add('upload-animate-pop');
-        }
-        const imgEl = document.getElementById('uploadedSlipImg');
-        imgEl.src = evt.target.result;
-        document.getElementById('UploadedSlipImgWrapper').classList.remove('hidden');
+        const rawDataUrl = evt.target.result;
+        const img = new Image();
+        img.onload = async function() {
+          const storeCanvas = document.createElement('canvas');
+          const maxStoreDim = 900;
+          let sw = img.width;
+          let sh = img.height;
+          if (sw > sh && sw > maxStoreDim) {
+            sh = Math.round((sh * maxStoreDim) / sw);
+            sw = maxStoreDim;
+          } else if (sh > maxStoreDim) {
+            sw = Math.round((sw * maxStoreDim) / sh);
+            sh = maxStoreDim;
+          }
+          storeCanvas.width = sw;
+          storeCanvas.height = sh;
+          storeCanvas.getContext('2d').drawImage(img, 0, 0, sw, sh);
+          currentUploadedSlipDataUrl = storeCanvas.toDataURL('image/jpeg', 0.84);
 
-        // จำลองการสกัดค่าจากไฟล์สลิปที่อัปโหลดเข้ามา พร้อมสร้างรหัสอ้างอิงให้คนตรวจทาน
-        const randomRef = `00425691120${Math.floor(1000000 + Math.random() * 8999999)}`;
-        const qrSim = `0041000600000101030040218${randomRef}5102TH91049B1C`;
-        document.getElementById('previewBankBadge').textContent = `อัปโหลดรูปสลิป: ${file.name}`;
-        document.getElementById('previewDateText').textContent = nowThaiTimestamp();
-        document.getElementById('previewRefText').textContent = randomRef;
-        document.getElementById('previewAmountText').textContent = '฿450.00';
-        document.getElementById('previewQrPayloadText').textContent = qrSim;
+          const imgEl = document.getElementById('uploadedSlipImg');
+          imgEl.src = currentUploadedSlipDataUrl;
+          document.getElementById('UploadedSlipImgWrapper').classList.remove('hidden');
+          document.getElementById('rescanSlipBtn').classList.remove('hidden');
+          document.getElementById('zoomCurrentSlipBtn').classList.remove('hidden');
 
-        document.getElementById('slipRefInput').value = randomRef;
-        document.getElementById('slipDateBEInput').value = '20/11/2569';
-        document.getElementById('slipTimeInput').value = '11:30';
-        document.getElementById('slipAmountInput').value = 450.00;
-        document.getElementById('humanVerifiedCheckbox').checked = false;
-        checkCurrentSlipDuplicateLive();
-        showToast('อ่านรูปสลิปที่อัปโหลดเรียบร้อย กรุณาตรวจสอบและแก้ไขข้อมูลให้ตรงก่อนบันทึก', 'success');
+          const cardEl = document.getElementById('slipPreviewCard');
+          if (cardEl) {
+            cardEl.classList.remove('upload-animate-pop');
+            void cardEl.offsetWidth;
+            cardEl.classList.add('upload-animate-pop');
+          }
+
+          await runRealSlipQrAndOcrScan(img, file.name);
+        };
+        img.src = rawDataUrl;
       };
       reader.readAsDataURL(file);
+    }
+
+    async function rescanCurrentSlipImage() {
+      if (!currentUploadedSlipDataUrl) {
+        showToast('กรุณาเลือกรูปสลิปก่อนกดสแกนซ้ำ', 'warning');
+        return;
+      }
+      const img = new Image();
+      img.onload = async function() {
+        await runRealSlipQrAndOcrScan(img, 'สแกนซ้ำจากรูปสลิป');
+      };
+      img.src = currentUploadedSlipDataUrl;
+    }
+
+    async function runRealSlipQrAndOcrScan(imgElement, sourceName) {
+      setSlipScanProgress(true, 'ขั้นที่ 1/2: กำลังสแกน Mini-QR บนสลิปธนาคาร...', 25);
+
+      const qrPayload = decodeQrFromImageElement(imgElement);
+      const qrDecoded = qrPayload ? parseThaiSlipMiniQR(qrPayload) : null;
+
+      if (qrPayload) {
+        document.getElementById('previewQrPayloadText').textContent = qrDecoded
+          ? `อ่าน QR สำเร็จ (${qrDecoded.bankName} | Ref: ${qrDecoded.transRef})`
+          : `อ่าน QR สำเร็จ: ${qrPayload}`;
+      } else {
+        document.getElementById('previewQrPayloadText').textContent = 'ไม่พบ Mini-QR หรือภาพ QR ไม่ชัด (ใช้ AI OCR อ่านข้อความแทน)';
+      }
+
+      let rawOcrText = '';
+      if (window.Tesseract) {
+        try {
+          setSlipScanProgress(true, 'ขั้นที่ 2/2: กำลังอ่านตัวอักษรภาษาไทย ยอดเงิน เวลา และชื่อด้วย AI OCR...', 40);
+          const ocrResult = await window.Tesseract.recognize(
+            imgElement,
+            'tha+eng',
+            {
+              logger: m => {
+                if (m && typeof m.progress === 'number') {
+                  const pct = 40 + Math.round(m.progress * 55);
+                  setSlipScanProgress(true, `กำลังอ่านข้อความภาษาไทยบนสลิป (${Math.round(m.progress * 100)}%)...`, pct);
+                }
+              }
+            }
+          );
+          rawOcrText = ocrResult?.data?.text || '';
+        } catch (ocrErr) {
+          rawOcrText = '';
+        }
+      }
+
+      const extracted = parseThaiSlipOcrText(rawOcrText, qrPayload);
+      setSlipScanProgress(false, '', 100);
+
+      const dNow = new Date();
+      const todayBE = `${String(dNow.getDate()).padStart(2, '0')}/${String(dNow.getMonth() + 1).padStart(2, '0')}/${dNow.getFullYear()}`;
+      const timeNow = `${String(dNow.getHours()).padStart(2, '0')}:${String(dNow.getMinutes()).padStart(2, '0')}`;
+
+      if (extracted.bankCode) {
+        document.getElementById('slipBankSelect').value = extracted.bankCode;
+      }
+
+      const finalRef = extracted.transRef || (qrPayload ? qrPayload.slice(0, 20) : `SLIP-${Date.now().toString().slice(-8)}`);
+      const finalDateBE = extracted.dateBE || todayBE;
+      const finalTime = extracted.time || timeNow;
+
+      document.getElementById('slipRefInput').value = finalRef;
+      document.getElementById('slipDateBEInput').value = finalDateBE;
+      document.getElementById('slipTimeInput').value = finalTime;
+
+      if (extracted.amount !== null && !Number.isNaN(extracted.amount)) {
+        document.getElementById('slipAmountInput').value = extracted.amount.toFixed(2);
+        document.getElementById('previewAmountText').textContent = formatCurrency(extracted.amount);
+      } else {
+        document.getElementById('slipAmountInput').value = '';
+        document.getElementById('previewAmountText').textContent = 'กรุณาระบุ/ตรวจสอบยอดเงิน';
+      }
+
+      if (extracted.sender) {
+        document.getElementById('slipSenderInput').value = extracted.sender;
+      } else if (!document.getElementById('slipSenderInput').value) {
+        document.getElementById('slipSenderInput').value = '';
+      }
+
+      if (extracted.receiver) {
+        document.getElementById('slipReceiverInput').value = extracted.receiver;
+      } else if (!document.getElementById('slipReceiverInput').value) {
+        document.getElementById('slipReceiverInput').value = state.companyQrInfo.accountName;
+      }
+
+      if (extracted.sender && /มนัสนันท์/.test(extracted.sender)) {
+        document.getElementById('slipTypeSelect').value = 'EXPENSE_SLIP';
+        handleSlipTypeChange();
+      } else if (extracted.receiver && /มนัสนันท์/.test(extracted.receiver)) {
+        document.getElementById('slipTypeSelect').value = 'INCOME_SLIP';
+        handleSlipTypeChange();
+      }
+
+      const bankSelect = document.getElementById('slipBankSelect');
+      const bankLabel = bankSelect.options[bankSelect.selectedIndex]?.text || sourceName;
+      document.getElementById('previewBankBadge').textContent = `สแกนแล้ว: ${bankLabel}`;
+      document.getElementById('previewDateText').textContent = `${finalDateBE} ${finalTime}`;
+      document.getElementById('previewRefText').textContent = finalRef;
+
+      renderOcrHelperChips(extracted.lines);
+      document.getElementById('humanVerifiedCheckbox').checked = false;
+      checkCurrentSlipDuplicateLive();
+
+      if (extracted.amount !== null) {
+        showToast(`สแกนสลิปสำเร็จ! อ่านยอดเงินได้ ${formatCurrency(extracted.amount)} เวลา ${finalTime} กรุณาตรวจสอบก่อนกดบันทึก`, 'success');
+      } else {
+        showToast('สแกนรูปสลิปแล้ว กรุณาตรวจสอบหรือคลิกข้อความที่สแกนได้เพื่อระบุยอดเงินและชื่อก่อนกดบันทึก', 'info');
+      }
+    }
+
+    function previewCurrentUploadedSlipFullscreen() {
+      if (!currentUploadedSlipDataUrl) return;
+      const area = document.getElementById('printableArea');
+      area.innerHTML = `
+        <div class="text-center space-y-2">
+          <div class="font-bold text-sm text-slate-900">ภาพสลิปที่กำลังตรวจสอบ</div>
+          <img src="${currentUploadedSlipDataUrl}" alt="ภาพสลิปต้นฉบับ" class="max-w-full h-auto max-h-[70vh] mx-auto rounded-xl border border-slate-200 shadow-sm" />
+        </div>
+      `;
+      openModal('receiptModal');
+    }
+
+    function viewSavedSlipImageModal(slipId) {
+      const s = state.slips.find(x => x.id === slipId);
+      if (!s) return;
+      const area = document.getElementById('printableArea');
+      const isIncome = s.type === 'INCOME_SLIP';
+      area.innerHTML = `
+        <div class="space-y-3 text-xs">
+          <div class="border-b border-slate-200 pb-2 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-sm text-slate-900">${isIncome ? 'สลิปรายรับ (เงินเข้า)' : 'สลิปรายจ่าย (เงินออก)'} - หมวด: ${s.category}</div>
+              <div class="text-[11px] text-slate-500">เลขอ้างอิง: ${s.transRef} | วันที่-เวลา: ${s.transDateBE} ${s.transTime}</div>
+            </div>
+            <span class="text-base font-bold font-num ${isIncome ? 'text-emerald-700' : 'text-rose-600'}">
+              ${isIncome ? '+' : '-'}${formatCurrency(s.amount)}
+            </span>
+          </div>
+          ${s.imageDataUrl
+            ? `<div class="bg-slate-50 p-2 rounded-xl border border-slate-200 text-center"><img src="${s.imageDataUrl}" alt="รูปสลิปที่บันทึกไว้" class="max-w-full h-auto max-h-[60vh] mx-auto rounded-lg object-contain" /></div>`
+            : `<div class="p-6 rounded-xl bg-slate-100 text-center text-slate-500">รายการนี้ถูกบันทึกโดยไม่มีไฟล์รูปแนบ</div>`
+          }
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px]">
+            <div><strong>ธนาคาร:</strong> ${s.bankName}</div>
+            <div><strong>ผูกบิลขาย:</strong> ${s.linkedSaleId || '-'}</div>
+            <div><strong>ผู้โอน:</strong> ${s.senderName}</div>
+            <div><strong>ผู้รับ:</strong> ${s.receiverName}</div>
+            <div class="col-span-2"><strong>ผู้ตรวจยืนยัน:</strong> ${s.verifiedBy}</div>
+          </div>
+        </div>
+      `;
+      openModal('receiptModal');
+    }
+
+    function deleteSavedSlip(slipId) {
+      const idx = state.slips.findIndex(x => x.id === slipId);
+      if (idx === -1) return;
+      const removed = state.slips.splice(idx, 1)[0];
+      addAuditLog('DELETE_SLIP', removed.transRef, `ลบรายการสลิป ${removed.category} ยอด ${formatCurrency(removed.amount)} (ปรับยอดงบการเงินอัตโนมัติ)`);
+      refreshAllViews();
+      showToast(`ลบสลิป ${removed.transRef} และอัปเดตหน้างบการเงินเรียบร้อยแล้ว`, 'info');
     }
 
     function handleSlipTypeChange() {
@@ -3020,10 +3447,24 @@
         amount: Number(document.getElementById('slipAmountInput')?.value || 0),
         transTime: document.getElementById('slipTimeInput')?.value || ''
       };
+      if (!candidate.transRef || !candidate.amount) return false;
       const isDup = isDuplicateSlip(state.slips, candidate);
       document.getElementById('slipDuplicateAlertBadge').classList.toggle('hidden', !isDup);
       document.getElementById('slipDuplicateWarningBox').classList.toggle('hidden', !isDup);
       return isDup;
+    }
+
+    function extractMonthKeyFromDateBE(dateBEStr) {
+      if (!dateBEStr) return '2569-11';
+      const parts = String(dateBEStr).trim().split(/[\/\-]/);
+      if (parts.length === 3) {
+        const mm = parts[1].padStart(2, '0');
+        let yyyy = parseInt(parts[2], 10);
+        if (yyyy < 100) yyyy = 2500 + yyyy;
+        else if (yyyy < 2400) yyyy += 543;
+        return `${yyyy}-${mm}`;
+      }
+      return '2569-11';
     }
 
     function handleConfirmSaveSlip(e) {
@@ -3037,41 +3478,107 @@
       const bankSelect = document.getElementById('slipBankSelect');
       const bankCode = bankSelect.value;
       const bankName = bankSelect.options[bankSelect.selectedIndex].text;
+      const transDateBE = document.getElementById('slipDateBEInput').value.trim();
+      const monthKey = extractMonthKeyFromDateBE(transDateBE);
+      const slipType = document.getElementById('slipTypeSelect').value;
+      const category = document.getElementById('slipCategorySelect').value;
+      const amount = round2(Number(document.getElementById('slipAmountInput').value));
+
       const newSlip = {
-        id: state.slips.length + 1,
-        type: document.getElementById('slipTypeSelect').value,
+        id: state.slips.length > 0 ? Math.max(...state.slips.map(x => x.id)) + 1 : 1,
+        type: slipType,
         bankCode,
         bankName,
         transRef: document.getElementById('slipRefInput').value.trim(),
-        transDateBE: document.getElementById('slipDateBEInput').value.trim(),
+        transDateBE,
+        monthKey,
         transTime: document.getElementById('slipTimeInput').value.trim(),
-        amount: round2(Number(document.getElementById('slipAmountInput').value)),
+        amount,
         senderName: document.getElementById('slipSenderInput').value.trim(),
         receiverName: document.getElementById('slipReceiverInput').value.trim(),
-        category: document.getElementById('slipCategorySelect').value,
+        category,
         linkedSaleId: document.getElementById('slipLinkSaleSelect').value || null,
-        verifiedBy: state.currentUser.fullName
+        imageDataUrl: currentUploadedSlipDataUrl || '',
+        verifiedBy: state.currentUser ? state.currentUser.fullName : 'Admin'
       };
 
       state.slips.unshift(newSlip);
-      addAuditLog('SLIP_VERIFIED_AND_SAVED', newSlip.transRef, `บันทึก${newSlip.type === 'INCOME_SLIP' ? 'สลิปรับเงิน' : 'สลิปรายจ่าย'} หมวด "${newSlip.category}" ยอด ${formatCurrency(newSlip.amount)}`);
+
+      ['2569-11', monthKey].filter((v, i, a) => a.indexOf(v) === i).forEach(mKey => {
+        if (!state.balanceSheets[mKey]) {
+          state.balanceSheets[mKey] = createEmptyBalanceSheet();
+        }
+      });
+      const targetBs = state.balanceSheets[monthKey] || state.balanceSheets['2569-11'];
+      if (slipType === 'INCOME_SLIP') {
+        targetBs.cashAndBank = round2(Number(targetBs.cashAndBank || 0) + amount);
+      } else {
+        targetBs.cashAndBank = round2(Number(targetBs.cashAndBank || 0) - amount);
+      }
+
+      addAuditLog(
+        'SLIP_VERIFIED_AND_SAVED',
+        newSlip.transRef,
+        `บันทึก${slipType === 'INCOME_SLIP' ? 'สลิปรายรับ (+เพิ่มเงิน)' : 'สลิปรายจ่าย (-หักเงิน)'} หมวด "${category}" ยอด ${formatCurrency(amount)} ซิงค์เข้างบการเงินทันที`
+      );
+
       document.getElementById('humanVerifiedCheckbox').checked = false;
       refreshAllViews();
       checkCurrentSlipDuplicateLive();
-      showToast(`ตรวจยืนยันและบันทึกสลิปอ้างอิง ${newSlip.transRef} เรียบร้อยแล้ว`, 'success');
+      showToast(
+        `บันทึกสลิป ${newSlip.transRef} (${slipType === 'INCOME_SLIP' ? '+' : '-'}${formatCurrency(amount)}) และซิงค์ยอดเข้าหน้างบการเงินเรียบร้อยแล้ว!`,
+        'success'
+      );
     }
 
     function renderSlipsTable() {
       const tbody = document.getElementById('slipsHistoryBody');
       if (!tbody) return;
+
+      const countBadge = document.getElementById('slipsTotalCountBadge');
+      if (countBadge) countBadge.textContent = `${state.slips.length} รายการ`;
+
+      const totalIncomeSlips = state.slips
+        .filter(s => s.type === 'INCOME_SLIP')
+        .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+      const totalCogsSlips = state.slips
+        .filter(s => s.type === 'EXPENSE_SLIP' && s.category === 'ค่าสินค้า')
+        .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+      const totalOpExSlips = state.slips
+        .filter(s => s.type === 'EXPENSE_SLIP' && s.category !== 'ค่าสินค้า')
+        .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+      const unlinkedPosSales = state.sales
+        .filter(sale => !state.slips.some(sl => sl.type === 'INCOME_SLIP' && sl.linkedSaleId === sale.receiptNo))
+        .reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
+      const netCashFlow = round2(unlinkedPosSales + totalIncomeSlips - totalCogsSlips - totalOpExSlips);
+
+      const incEl = document.getElementById('slipSyncIncomeText');
+      if (incEl) incEl.textContent = '+' + formatCurrency(totalIncomeSlips);
+      const cogsEl = document.getElementById('slipSyncCogsExpenseText');
+      if (cogsEl) cogsEl.textContent = '-' + formatCurrency(totalCogsSlips);
+      const opEl = document.getElementById('slipSyncOpExpenseText');
+      if (opEl) opEl.textContent = '-' + formatCurrency(totalOpExSlips);
+      const netEl = document.getElementById('slipSyncNetCashText');
+      if (netEl) netEl.textContent = formatCurrency(netCashFlow);
+
+      if (state.slips.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-xs text-slate-400">ยังไม่มีรายการสลิปที่บันทึก กรุณาอัปโหลดรูปสลิปด้านบนแล้วกดยืนยันบันทึก</td></tr>`;
+        return;
+      }
+
       tbody.innerHTML = state.slips.map(s => {
         const isIncome = s.type === 'INCOME_SLIP';
+        const thumbHtml = s.imageDataUrl
+          ? `<img src="${s.imageDataUrl}" alt="สลิป" onclick="viewSavedSlipImageModal(${s.id})" class="w-10 h-12 rounded-lg object-cover border border-slate-300 cursor-pointer hover:scale-105 transition" title="คลิกเพื่อดูรูปสลิปขนาดใหญ่" />`
+          : `<span class="text-[10px] text-slate-400">ไม่มีรูป</span>`;
+
         return `
           <tr class="hover:bg-slate-50">
+            <td class="py-2 px-2.5">${thumbHtml}</td>
             <td class="py-2 px-2.5 font-num text-slate-600">${s.transDateBE} ${s.transTime}</td>
             <td class="py-2 px-2.5">
-              <span class="px-2 py-0.5 rounded font-bold text-[10px] ${isIncome ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-                ${isIncome ? 'รายรับ' : 'รายจ่าย'}: ${s.category}
+              <span class="px-2 py-0.5 rounded font-bold text-[10px] ${isIncome ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${isIncome ? 'รายรับ (+เพิ่มเงิน)' : 'รายจ่าย (-หักเงิน)'}: ${s.category}
               </span>
             </td>
             <td class="py-2 px-2.5 text-slate-700">${s.bankName}</td>
@@ -3081,77 +3588,108 @@
             <td class="py-2 px-2.5 text-right font-num font-bold ${isIncome ? 'text-emerald-700' : 'text-rose-600'}">
               ${isIncome ? '+' : '-'}${formatCurrency(s.amount)}
             </td>
-            <td class="py-2 px-2.5 text-slate-500">${s.verifiedBy}</td>
+            <td class="py-2 px-2.5 text-center space-x-1">
+              <button type="button" onclick="viewSavedSlipImageModal(${s.id})" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px]">
+                🖼️ ดูรูปสลิป
+              </button>
+              <button type="button" onclick="deleteSavedSlip(${s.id})" class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold text-[11px]">
+                ลบ
+              </button>
+            </td>
           </tr>
         `;
       }).join('');
     }
 
     // =========================================================================
-    // 8. FINANCIAL DASHBOARD, 12 RATIOS & BALANCE SHEET (ADMIN ONLY)
+    // 8. REAL-TIME SYNCED FINANCIAL DASHBOARD, 12 RATIOS & BALANCE SHEET
     // =========================================================================
+    function filterItemsByPeriod(items, periodKey, getMonthFn) {
+      if (!periodKey || periodKey === 'ALL_TIME' || periodKey === 'YEAR-2569' || periodKey === 'Q4-2569') {
+        return items;
+      }
+      return items.filter(item => getMonthFn(item) === periodKey);
+    }
+
     function getMetricsForPeriod(periodKey) {
       const currentInv = getTotalInventoryCostValue();
-      const novSalesRevenue = state.sales
-        .filter(s => s.monthKey === '2569-11')
-        .reduce((acc, s) => acc + (s.grandTotal - s.vatAmount), 0);
-      const novSalesCogs = state.sales
-        .filter(s => s.monthKey === '2569-11')
-        .reduce((acc, s) => acc + s.totalCogs, 0);
-      const novSlipExpenses = state.slips
-        .filter(s => s.type === 'EXPENSE_SLIP' && s.category !== 'ค่าสินค้า')
-        .reduce((acc, s) => acc + s.amount, 0);
+      const matchedSales = filterItemsByPeriod(state.sales, periodKey, s => s.monthKey || extractMonthKeyFromDateBE(s.timestamp));
+      const matchedSlips = filterItemsByPeriod(state.slips, periodKey, s => s.monthKey || extractMonthKeyFromDateBE(s.transDateBE));
 
+      const posRevenue = matchedSales.reduce((acc, s) => acc + (Number(s.grandTotal || 0) - Number(s.vatAmount || 0)), 0);
+      const posCogs = matchedSales.reduce((acc, s) => acc + Number(s.totalCogs || 0), 0);
+
+      const unlinkedIncomeSlips = matchedSlips.filter(s =>
+        s.type === 'INCOME_SLIP' &&
+        (!s.linkedSaleId || !matchedSales.some(sale => sale.receiptNo === s.linkedSaleId))
+      );
+      const linkedIncomeSlips = matchedSlips.filter(s =>
+        s.type === 'INCOME_SLIP' &&
+        s.linkedSaleId &&
+        matchedSales.some(sale => sale.receiptNo === s.linkedSaleId)
+      );
+      const slipIncomeAdded = unlinkedIncomeSlips.reduce((acc, s) => acc + Number(s.amount || 0), 0);
+
+      const slipCogsExpenses = matchedSlips
+        .filter(s => s.type === 'EXPENSE_SLIP' && s.category === 'ค่าสินค้า')
+        .reduce((acc, s) => acc + Number(s.amount || 0), 0);
+
+      const slipOperatingExpenses = matchedSlips
+        .filter(s => s.type === 'EXPENSE_SLIP' && s.category !== 'ค่าสินค้า')
+        .reduce((acc, s) => acc + Number(s.amount || 0), 0);
+
+      let histRev = 0, histCogs = 0, histExp = 0;
       if (periodKey === '2569-09' || periodKey === '2569-10') {
         const hm = state.historicalMonths[periodKey];
-        return calculateFinancialRatios({
-          revenue: hm.fixedRevenue,
-          cogs: hm.fixedCogs,
-          operatingExpenses: hm.fixedExpenses,
-          inventoryValue: hm.endingInventory,
-          beginningInventoryValue: hm.beginningInventory,
-          periodDays: 30,
-          balanceSheet: state.balanceSheets[periodKey]
-        });
+        if (hm) {
+          histRev = hm.fixedRevenue || 0;
+          histCogs = hm.fixedCogs || 0;
+          histExp = hm.fixedExpenses || 0;
+        }
       }
 
-      if (periodKey === '2569-11') {
-        return calculateFinancialRatios({
-          revenue: novSalesRevenue,
-          cogs: novSalesCogs,
-          operatingExpenses: novSlipExpenses,
-          inventoryValue: currentInv,
-          beginningInventoryValue: 18000,
-          periodDays: 30,
-          balanceSheet: state.balanceSheets['2569-11']
-        });
-      }
+      const totalRevenue = round2(posRevenue + slipIncomeAdded + histRev);
+      const totalCogs = round2(posCogs + slipCogsExpenses + histCogs);
+      const totalOperatingExpenses = round2(slipOperatingExpenses + histExp);
 
-      // Quarterly or Yearly aggregation
-      const sep = state.historicalMonths['2569-09'];
-      const oct = state.historicalMonths['2569-10'];
-      const totalRev = sep.fixedRevenue + oct.fixedRevenue + novSalesRevenue;
-      const totalCogs = sep.fixedCogs + oct.fixedCogs + novSalesCogs;
-      const totalExp = sep.fixedExpenses + oct.fixedExpenses + novSlipExpenses;
-      const days = periodKey === 'Q4-2569' ? 90 : 365;
+      const activeMonthBsKey = (periodKey === '2569-09' || periodKey === '2569-10') ? periodKey : '2569-11';
+      const rawBs = state.balanceSheets[activeMonthBsKey] || createEmptyBalanceSheet();
 
-      return calculateFinancialRatios({
-        revenue: totalRev,
+      const days = periodKey === 'Q4-2569' ? 90 : (periodKey === 'YEAR-2569' ? 365 : 30);
+
+      const calcResult = calculateFinancialRatios({
+        revenue: totalRevenue,
         cogs: totalCogs,
-        operatingExpenses: totalExp,
+        operatingExpenses: totalOperatingExpenses,
         inventoryValue: currentInv,
-        beginningInventoryValue: sep.beginningInventory,
+        beginningInventoryValue: currentInv,
         periodDays: days,
-        balanceSheet: state.balanceSheets['2569-11']
+        balanceSheet: rawBs
       });
+
+      calcResult.breakdown = {
+        posRevenue: round2(posRevenue),
+        posSalesCount: matchedSales.length,
+        slipIncomeAdded: round2(slipIncomeAdded),
+        unlinkedIncomeCount: unlinkedIncomeSlips.length,
+        linkedIncomeCount: linkedIncomeSlips.length,
+        posCogs: round2(posCogs),
+        slipCogsExpenses: round2(slipCogsExpenses),
+        slipOperatingExpenses: round2(slipOperatingExpenses),
+        expenseSlipCount: matchedSlips.filter(s => s.type === 'EXPENSE_SLIP').length
+      };
+
+      return calcResult;
     }
 
     function renderFinanceDashboard() {
-      const periodKey = document.getElementById('financePeriodSelect')?.value || '2569-11';
+      const periodKey = document.getElementById('financePeriodSelect')?.value || 'ALL_TIME';
       const activeMonthBsKey = (periodKey === '2569-09' || periodKey === '2569-10') ? periodKey : '2569-11';
+      if (!state.balanceSheets[activeMonthBsKey]) {
+        state.balanceSheets[activeMonthBsKey] = createEmptyBalanceSheet();
+      }
       const bs = state.balanceSheets[activeMonthBsKey];
 
-      // Populate Balance Sheet form
       document.getElementById('bsCashInput').value = bs.cashAndBank;
       document.getElementById('bsArInput').value = bs.accountsReceivable;
       document.getElementById('bsInventoryReadonly').value = formatCurrency(getTotalInventoryCostValue());
@@ -3176,15 +3714,36 @@
 
       const currentRes = getMetricsForPeriod(periodKey);
       const prevRes = getMetricsForPeriod('2569-10');
+      const bd = currentRes.breakdown;
 
-      // Update 5 P&L cards
       document.getElementById('finCardRevenue').textContent = formatCurrency(currentRes.summary.revenue);
       document.getElementById('finCardCogs').textContent = formatCurrency(currentRes.summary.cogs);
       document.getElementById('finCardGrossProfit').textContent = formatCurrency(currentRes.summary.grossProfit);
       document.getElementById('finCardExpenses').textContent = formatCurrency(currentRes.summary.operatingExpenses + currentRes.summary.interestExpense);
       document.getElementById('finCardNetProfit').textContent = formatCurrency(currentRes.summary.netProfit);
 
-      // Define the 12 ratios metadata & plain-Thai interpretation
+      const bdBox = document.getElementById('finSyncBreakdownContent');
+      if (bdBox && bd) {
+        bdBox.innerHTML = `
+          <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-1">
+            <div class="font-bold text-emerald-900">1. ที่มาของรายได้รวม (${formatCurrency(currentRes.summary.revenue)})</div>
+            <div class="text-slate-600 flex justify-between"><span>• ยอดขายจากหน้า POS (${bd.posSalesCount} บิล):</span><span class="font-num font-semibold">+${formatCurrency(bd.posRevenue)}</span></div>
+            <div class="text-slate-600 flex justify-between"><span>• สลิปรายรับโอนเงิน (${bd.unlinkedIncomeCount} ใบ):</span><span class="font-num font-semibold text-emerald-700">+${formatCurrency(bd.slipIncomeAdded)}</span></div>
+            ${bd.linkedIncomeCount > 0 ? `<div class="text-[10px] text-slate-500">(*สลิปที่ผูกกับบิล POS แล้ว ${bd.linkedIncomeCount} ใบ ไม่นับซ้ำ)</div>` : ''}
+          </div>
+          <div class="p-3 rounded-xl bg-rose-50/60 border border-rose-200 space-y-1">
+            <div class="font-bold text-rose-900">2. ที่มาของต้นทุนขาย COGS (${formatCurrency(currentRes.summary.cogs)})</div>
+            <div class="text-slate-600 flex justify-between"><span>• ต้นทุนตัดสต็อก FIFO ตอนขาย:</span><span class="font-num font-semibold">-${formatCurrency(bd.posCogs)}</span></div>
+            <div class="text-slate-600 flex justify-between"><span>• สลิปรายจ่ายหมวด "ค่าสินค้า":</span><span class="font-num font-semibold text-rose-600">-${formatCurrency(bd.slipCogsExpenses)}</span></div>
+          </div>
+          <div class="p-3 rounded-xl bg-amber-50/60 border border-amber-200 space-y-1">
+            <div class="font-bold text-amber-900">3. ที่มาของค่าใช้จ่าย (${formatCurrency(currentRes.summary.operatingExpenses + currentRes.summary.interestExpense)})</div>
+            <div class="text-slate-600 flex justify-between"><span>• สลิปรายจ่าย เช่า/น้ำไฟ/เงินเดือน/อื่นๆ:</span><span class="font-num font-semibold text-amber-700">-${formatCurrency(bd.slipOperatingExpenses)}</span></div>
+            <div class="text-slate-600 flex justify-between"><span>• ดอกเบี้ยจ่าย (จากงบดุล):</span><span class="font-num font-semibold">-${formatCurrency(currentRes.summary.interestExpense)}</span></div>
+          </div>
+        `;
+      }
+
       const r = currentRes.ratios;
       const pr = prevRes.ratios;
 
@@ -3198,7 +3757,7 @@
           meaning: 'ขายของ 100 บาท หักต้นทุนสินค้าแล้วเหลือกำไรกี่บาท',
           interpret: (val, pVal) => val >= 35
             ? `กำไรขั้นต้นอยู่ในเกณฑ์ดีมาก (${val}%) ${pVal ? (val >= pVal ? 'เพิ่มขึ้นจากเดือนก่อน' : 'ลดลงเล็กน้อยจากเดือนก่อน') : ''}`
-            : `กำไรขั้นต้นค่อนข้างบาง (${val}%) ควรระวังต้นทุนสินค้าที่ปรับตัวสูงขึ้น`
+            : `กำไรขั้นต้นอยู่ที่ ${val}% ควรระวังต้นทุนสินค้าที่ปรับตัวสูงขึ้น`
         },
         {
           group: 'ความสามารถทำกำไร',
@@ -3206,10 +3765,10 @@
           data: r.netMargin,
           prev: pr.netMargin,
           formula: '(กำไรสุทธิ ÷ รายได้จากการขาย) × 100',
-          meaning: 'ขายของ 100 บาท หักต้นทุนและค่าเช่า/น้ำไฟ/เงินเดือนแล้วเหลือถึงมือเจ้าของกี่บาท',
+          meaning: 'ขายของ 100 บาท หักต้นทุนและสลิปรายจ่ายทุกหมวดแล้วเหลือถึงมือเจ้าของกี่บาท',
           interpret: (val) => val >= 15
-            ? `ร้านทำกำไรสุทธิได้แข็งแกร่ง (${val}%) คุมค่าใช้จ่ายหน้าร้านได้ดี`
-            : `กำไรสุทธิ ${val}% ควรตรวจสอบค่าใช้จ่ายคงที่ เช่น ค่าไฟหรือค่าเช่า`
+            ? `ร้านทำกำไรสุทธิได้แข็งแกร่ง (${val}%) คุมค่าใช้จ่ายได้ดี`
+            : `กำไรสุทธิ ${val}% ควรตรวจสอบสลิปค่าใช้จ่ายคงที่ เช่น ค่าไฟหรือค่าเช่า`
         },
         {
           group: 'ความสามารถทำกำไร',
@@ -3227,7 +3786,7 @@
           prev: pr.roe,
           formula: '(กำไรสุทธิ ÷ ทุนของเจ้าของ) × 100',
           meaning: 'เงินทุนที่เจ้าของลงไป งอกเงยเป็นกำไรสุทธิกลับมาคิดเป็นกี่ %',
-          interpret: (val) => `เงินทุนเจ้าของสร้างผลตอบแทนได้ ${val}% สูงกว่าดอกเบี้ยเงินฝากธนาคารมาก`
+          interpret: (val) => `เงินทุนเจ้าของสร้างผลตอบแทนได้ ${val}%`
         },
         {
           group: 'สภาพคล่อง',
@@ -3248,7 +3807,7 @@
           formula: '(เงินสดและเงินฝาก + ลูกหนี้การค้า) ÷ หนี้สินหมุนเวียนรวม',
           meaning: 'ถ้าไม่นับสต็อกสินค้าเลย มีเงินสดพร้อมจ่ายหนี้ระยะสั้นได้ทันทีกี่เท่า (ควร > 1.0 เท่า)',
           interpret: (val) => val >= 1.0
-            ? `สภาพคล่องเงินสดดีมาก (${val} เท่า) จ่ายหนี้ระยะสั้นได้ทันทีแม้ยังขายสต็อกไม่ออก`
+            ? `สภาพคล่องเงินสดดีมาก (${val} เท่า) จ่ายหนี้ระยะสั้นได้ทันที`
             : `เงินสดสำรองต่ำกว่าหนี้ระยะสั้น (${val} เท่า) ต้องเร่งระบายสต็อกเป็นเงินสด`
         },
         {
@@ -3258,20 +3817,16 @@
           prev: pr.inventoryTurnover,
           formula: 'ต้นทุนขาย (COGS) ÷ สินค้าคงเหลือเฉลี่ย',
           meaning: 'ในงวดนี้ สต็อกสินค้าถูกขายออกไปและเติมใหม่ทั้งหมดกี่รอบ (ยิ่งสูงยิ่งขายไว)',
-          interpret: (val, pVal) => pVal
-            ? (val >= pVal ? `สต็อกหมุนเร็วขึ้นเป็น ${val} รอบ (เดือนก่อน ${pVal} รอบ) สินค้าขายออกไว` : `สต็อกหมุนช้าลงเหลือ ${val} รอบ (เดือนก่อน ${pVal} รอบ)`)
-            : `สต็อกหมุนเวียน ${val} รอบในงวดนี้`
+          interpret: (val) => `สต็อกหมุนเวียน ${val} รอบในงวดนี้`
         },
         {
           group: 'ประสิทธิภาพการหมุนเวียน',
           name: '8. ระยะเวลาขายสินค้าเฉลี่ย (Days Inventory - DIO)',
           data: r.daysInventory,
           prev: pr.daysInventory,
-          formula: 'จำนวนวันในงวด (30 วัน) ÷ อัตราหมุนเวียนสินค้าคงเหลือ',
+          formula: 'จำนวนวันในงวด ÷ อัตราหมุนเวียนสินค้าคงเหลือ',
           meaning: 'รับของเข้าสต็อกแล้ว ใช้เวลาเฉลี่ยกี่วันกว่าจะขายออกหมด',
-          interpret: (val, pVal) => pVal
-            ? (val <= pVal ? `ใช้เวลาขายสินค้าสั้นลง เหลือเพียง ${val} วัน (เดือนก่อน ${pVal} วัน)` : `ของค้างสต็อกนานขึ้นเป็น ${val} วัน (เดือนก่อน ${pVal} วัน)`)
-            : `สินค้าอยู่ในร้านเฉลี่ย ${val} วันก่อนขายออก`
+          interpret: (val) => `สินค้าอยู่ในร้านเฉลี่ย ${val} วันก่อนขายออก`
         },
         {
           group: 'ประสิทธิภาพการหมุนเวียน',
@@ -3280,7 +3835,7 @@
           prev: pr.arTurnover,
           formula: 'รายได้จากการขาย ÷ ลูกหนี้การค้า (กรณีมีขายเชื่อ)',
           meaning: 'เก็บเงินจากลูกหนี้การค้าได้เร็วแค่ไหนในงวดนี้',
-          interpret: (val) => `เก็บหนี้ลูกค้าหมุนเวียนได้ ${val} รอบต่อเดือน`
+          interpret: (val) => `เก็บหนี้ลูกค้าหมุนเวียนได้ ${val} รอบ`
         },
         {
           group: 'ประสิทธิภาพการหมุนเวียน',
@@ -3288,8 +3843,8 @@
           data: r.apTurnover,
           prev: pr.apTurnover,
           formula: 'ต้นทุนขาย (COGS) ÷ เจ้าหนี้การค้า',
-          meaning: 'ร้านจ่ายเงินคืนเจ้าหนี้ค่าสินค้า (ยี่ปั๊ว/ซัพพลายเออร์) กี่รอบในงวดนี้',
-          interpret: (val) => `หมุนเวียนชำระเจ้าหนี้การค้า ${val} รอบ (บริหารเครดิตเทอมได้ดี)`
+          meaning: 'ร้านจ่ายเงินคืนเจ้าหนี้ค่าสินค้ากี่รอบในงวดนี้',
+          interpret: (val) => `หมุนเวียนชำระเจ้าหนี้การค้า ${val} รอบ`
         },
         {
           group: 'โครงสร้างเงินทุน',
@@ -3299,8 +3854,8 @@
           formula: 'หนี้สินรวมทั้งหมด ÷ ส่วนของเจ้าของ (ทุน)',
           meaning: 'ร้านมีหนี้สินเป็นกี่เท่าของเงินทุนตัวเอง (สำหรับ SME ควรต่ำกว่า 1.5 เท่า)',
           interpret: (val) => val <= 1.0
-            ? `ภาระหนี้ต่ำ (${val} เท่า) ร้านใช้ทุนตัวเองเป็นหลัก ความเสี่ยงทางการเงินต่ำ`
-            : `ภาระหนี้ต่อทุนอยู่ที่ ${val} เท่า ควรระวังการกู้ยืมเพิ่ม`
+            ? `ภาระหนี้ต่ำ (${val} เท่า) ความเสี่ยงทางการเงินต่ำ`
+            : `ภาระหนี้ต่อทุนอยู่ที่ ${val} เท่า`
         },
         {
           group: 'โครงสร้างเงินทุน',
@@ -3309,7 +3864,7 @@
           prev: pr.interestCoverage,
           formula: 'กำไรจากการดำเนินงาน (EBIT) ÷ ดอกเบี้ยจ่าย',
           meaning: 'กำไรจากการขายของเป็นกี่เท่าของดอกเบี้ยเงินกู้ที่ต้องจ่ายธนาคาร',
-          interpret: (val) => `กำไรจากการดำเนินงานสูงกว่าดอกเบี้ยจ่ายถึง ${val} เท่า จ่ายดอกเบี้ยได้สบาย`
+          interpret: (val) => `กำไรจากการดำเนินงานคิดเป็น ${val} เท่าของดอกเบี้ยจ่าย`
         }
       ];
 
@@ -3321,7 +3876,7 @@
             <div>
               <div class="flex items-center justify-between gap-2 mb-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600">${spec.group}</span>
-                ${spec.data.requiresBalanceSheet ? '<span class="text-[10px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">ต้องใช้งบดุล</span>' : '<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">คำนวณจาก POS ทันที</span>'}
+                ${spec.data.requiresBalanceSheet ? '<span class="text-[10px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">ต้องใช้งบดุล</span>' : '<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">คำนวณจาก POS + สลิปทันที</span>'}
               </div>
               <h4 class="text-xs font-bold text-slate-900">${spec.name}</h4>
               <div class="mt-2 flex items-baseline justify-between">
@@ -3347,7 +3902,7 @@
     }
 
     function toggleBalanceSheetSubmittedState() {
-      const periodKey = document.getElementById('financePeriodSelect')?.value || '2569-11';
+      const periodKey = document.getElementById('financePeriodSelect')?.value || 'ALL_TIME';
       const activeMonthBsKey = (periodKey === '2569-09' || periodKey === '2569-10') ? periodKey : '2569-11';
       const bs = state.balanceSheets[activeMonthBsKey];
       bs.isSubmitted = !bs.isSubmitted;
@@ -3358,7 +3913,7 @@
 
     function handleSaveBalanceSheet(e) {
       e.preventDefault();
-      const periodKey = document.getElementById('financePeriodSelect')?.value || '2569-11';
+      const periodKey = document.getElementById('financePeriodSelect')?.value || 'ALL_TIME';
       const activeMonthBsKey = (periodKey === '2569-09' || periodKey === '2569-10') ? periodKey : '2569-11';
 
       state.balanceSheets[activeMonthBsKey] = {
@@ -3382,9 +3937,9 @@
     function renderFinanceCharts() {
       const mSep = getMetricsForPeriod('2569-09');
       const mOct = getMetricsForPeriod('2569-10');
-      const mNov = getMetricsForPeriod('2569-11');
+      const mAll = getMetricsForPeriod('ALL_TIME');
 
-      const labels = ['ก.ย. 2569', 'ต.ค. 2569', 'พ.ย. 2569'];
+      const labels = ['ก.ย. 2569', 'ต.ค. 2569', 'พ.ย. 2569 / ปัจจุบัน'];
 
       const ctx1 = document.getElementById('revenueProfitChart')?.getContext('2d');
       if (ctx1 && window.Chart) {
@@ -3395,21 +3950,27 @@
             labels,
             datasets: [
               {
-                label: 'รายได้จากการขาย (฿)',
-                data: [mSep.summary.revenue, mOct.summary.revenue, mNov.summary.revenue],
-                backgroundColor: '#4f46e5',
+                label: 'รายได้รวม POS + สลิปรายรับ (฿)',
+                data: [mSep.summary.revenue, mOct.summary.revenue, mAll.summary.revenue],
+                backgroundColor: '#0d9488',
                 borderRadius: 6
               },
               {
-                label: 'ต้นทุนขาย FIFO (฿)',
-                data: [mSep.summary.cogs, mOct.summary.cogs, mNov.summary.cogs],
+                label: 'ต้นทุนขาย + สลิปค่าสินค้า (฿)',
+                data: [mSep.summary.cogs, mOct.summary.cogs, mAll.summary.cogs],
                 backgroundColor: '#f43f5e',
                 borderRadius: 6
               },
               {
+                label: 'ค่าใช้จ่ายจากสลิป (฿)',
+                data: [mSep.summary.operatingExpenses, mOct.summary.operatingExpenses, mAll.summary.operatingExpenses],
+                backgroundColor: '#f59e0b',
+                borderRadius: 6
+              },
+              {
                 label: 'กำไรสุทธิ (฿)',
-                data: [mSep.summary.netProfit, mOct.summary.netProfit, mNov.summary.netProfit],
-                backgroundColor: '#10b981',
+                data: [mSep.summary.netProfit, mOct.summary.netProfit, mAll.summary.netProfit],
+                backgroundColor: '#4f46e5',
                 borderRadius: 6
               }
             ]
@@ -3432,21 +3993,21 @@
             datasets: [
               {
                 label: 'อัตรากำไรขั้นต้น (%)',
-                data: [mSep.ratios.grossMargin.value, mOct.ratios.grossMargin.value, mNov.ratios.grossMargin.value],
+                data: [mSep.ratios.grossMargin.value || 0, mOct.ratios.grossMargin.value || 0, mAll.ratios.grossMargin.value || 0],
+                borderColor: '#0d9488',
+                backgroundColor: '#0d9488',
+                tension: 0.3
+              },
+              {
+                label: 'อัตรากำไรสุทธิ (%)',
+                data: [mSep.ratios.netMargin.value || 0, mOct.ratios.netMargin.value || 0, mAll.ratios.netMargin.value || 0],
                 borderColor: '#4f46e5',
                 backgroundColor: '#4f46e5',
                 tension: 0.3
               },
               {
-                label: 'อัตรากำไรสุทธิ (%)',
-                data: [mSep.ratios.netMargin.value, mOct.ratios.netMargin.value, mNov.ratios.netMargin.value],
-                borderColor: '#10b981',
-                backgroundColor: '#10b981',
-                tension: 0.3
-              },
-              {
                 label: 'ระยะเวลาขายสินค้า DIO (วัน)',
-                data: [mSep.ratios.daysInventory.value, mOct.ratios.daysInventory.value, mNov.ratios.daysInventory.value],
+                data: [mSep.ratios.daysInventory.value || 0, mOct.ratios.daysInventory.value || 0, mAll.ratios.daysInventory.value || 0],
                 borderColor: '#f59e0b',
                 backgroundColor: '#f59e0b',
                 tension: 0.3
@@ -3463,16 +4024,16 @@
     }
 
     function exportFinancialReportCSV() {
-      const periodKey = document.getElementById('financePeriodSelect')?.value || '2569-11';
+      const periodKey = document.getElementById('financePeriodSelect')?.value || 'ALL_TIME';
       const res = getMetricsForPeriod(periodKey);
       const r = res.ratios;
       const rows = [
-        ['รายงานงบการเงินและอัตราส่วนทางการเงิน (สยามสมาร์ท POS)', `งวด: ${periodKey}`],
+        [`รายงานงบการเงินและอัตราส่วนทางการเงิน (${state.shopName})`, `งวด: ${periodKey}`],
         ['รายการ', 'ค่าที่คำนวณได้', 'หน่วย / สถานะ'],
-        ['รายได้จากการขายสุทธิ', res.summary.revenue, 'บาท'],
-        ['ต้นทุนขาย (COGS FIFO)', res.summary.cogs, 'บาท'],
+        ['รายได้รวม (ขาย POS + สลิปรายรับ)', res.summary.revenue, 'บาท'],
+        ['ต้นทุนขายรวม (FIFO + สลิปค่าสินค้า)', res.summary.cogs, 'บาท'],
         ['กำไรขั้นต้น (Gross Profit)', res.summary.grossProfit, 'บาท'],
-        ['ค่าใช้จ่ายในการดำเนินงาน', res.summary.operatingExpenses, 'บาท'],
+        ['ค่าใช้จ่ายในการดำเนินงาน (จากสลิปรายจ่าย)', res.summary.operatingExpenses, 'บาท'],
         ['ดอกเบี้ยจ่าย', res.summary.interestExpense, 'บาท'],
         ['กำไรสุทธิ (Net Profit)', res.summary.netProfit, 'บาท'],
         ['--- อัตราส่วนทางการเงิน 12 ตัว ---', '', ''],
@@ -3504,20 +4065,21 @@
     }
 
     function printFinancialReportPDF() {
-      const periodKey = document.getElementById('financePeriodSelect')?.value || '2569-11';
+      const periodKey = document.getElementById('financePeriodSelect')?.value || 'ALL_TIME';
       const res = getMetricsForPeriod(periodKey);
       const r = res.ratios;
       const area = document.getElementById('printableArea');
       area.innerHTML = `
         <div class="border-b border-slate-300 pb-2 mb-2">
           <div class="font-bold text-sm">รายงานวิเคราะห์งบการเงินและอัตราส่วนทางการเงิน 12 ตัว</div>
-          <div class="text-xs text-slate-600">ร้านสยามมินิมาร์ท (Siam Smart POS) • งวด: ${periodKey} • พิมพ์เมื่อ: ${nowThaiTimestamp()}</div>
+          <div class="text-xs text-slate-600">${state.shopName} • งวด: ${periodKey} • พิมพ์เมื่อ: ${nowThaiTimestamp()}</div>
         </div>
         <div class="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 mb-2">
-          <div>รายได้จากการขายสุทธิ: <strong>${formatCurrency(res.summary.revenue)}</strong></div>
-          <div>ต้นทุนขาย (COGS FIFO): <strong>${formatCurrency(res.summary.cogs)}</strong></div>
+          <div>รายได้รวม (POS + สลิปรายรับ): <strong>${formatCurrency(res.summary.revenue)}</strong></div>
+          <div>ต้นทุนขาย (FIFO + สลิปค่าสินค้า): <strong>${formatCurrency(res.summary.cogs)}</strong></div>
           <div>กำไรขั้นต้น: <strong>${formatCurrency(res.summary.grossProfit)}</strong></div>
-          <div>กำไรสุทธิ: <strong>${formatCurrency(res.summary.netProfit)}</strong></div>
+          <div>ค่าใช้จ่ายดำเนินงาน (สลิป): <strong>${formatCurrency(res.summary.operatingExpenses)}</strong></div>
+          <div class="col-span-2">กำไรสุทธิ (Net Profit): <strong>${formatCurrency(res.summary.netProfit)}</strong></div>
         </div>
         <table class="w-full text-left text-[11px] border-collapse">
           <thead>
@@ -3887,7 +4449,7 @@
       populateSlipSaleLinkDropdown();
       renderSlipsTable();
       renderAdminTab();
-      if (state.activeTab === 'finance') renderFinanceDashboard();
+      renderFinanceDashboard();
       if (window.lucide) window.lucide.createIcons();
     }
 
