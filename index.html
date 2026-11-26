@@ -323,6 +323,11 @@
             <span>VAT 7%</span>
           </label>
 
+          <button type="button" id="cloudSyncHeaderBtn" onclick="openCloudSyncModal()" class="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-xs font-bold flex items-center gap-1.5 transition" title="เชื่อมต่อฐานข้อมูลออนไลน์ฟรี (Firebase Cloud Sync)">
+            <i data-lucide="cloud" class="w-3.5 h-3.5 text-sky-600"></i>
+            <span id="cloudSyncHeaderStatusText">เชื่อม Cloud ฟรี</span>
+          </button>
+
           <button type="button" onclick="exportDatabaseBackup()" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium flex items-center gap-1 transition" title="สำรองฐานข้อมูลทั้งหมดเป็นไฟล์ JSON">
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
             <span class="hidden sm:inline">สำรองข้อมูล</span>
@@ -1498,6 +1503,65 @@
     </div>
   </div>
 
+  <!-- Cloud Database Sync Modal (Firebase Realtime Database - Free) -->
+  <div id="cloudSyncModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 modal-animate-in space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-200">
+            <i data-lucide="cloud" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">เชื่อมต่อฐานข้อมูลออนไลน์ฟรี (Google Firebase Realtime Sync)</h3>
+            <p class="text-xs text-slate-500">ให้คอมพิวเตอร์และมือถือทุกเครื่องที่เข้าเว็บ เห็นสินค้า สต็อก สลิป และงบการเงินชุดเดียวกันแบบ Realtime</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('cloudSyncModal')" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+        <div class="font-bold text-slate-800">สถานะการเชื่อมต่อปัจจุบัน: <span id="cloudModalCurrentStatus" class="text-amber-700">ยังไม่ได้เชื่อมต่อ (เก็บข้อมูลในเครื่องนี้เท่านั้น)</span></div>
+        <div class="text-[11px] text-slate-500">เพียงนำลิงก์ <strong>Realtime Database URL</strong> จากเว็บ Google Firebase (ฟรี 0 บาท) มาวางในช่องด้านล่างเพียงช่องเดียว ระบบจะซิงค์ข้อมูลทุกเครื่องให้อัตโนมัติโดยไม่ต้องแก้โค้ด!</div>
+      </div>
+
+      <form onsubmit="handleSaveCloudSyncConfig(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-800 mb-1" for="firebaseDbUrlInput">1. วางลิงก์ Firebase Realtime Database URL (หรือวางโค้ด firebaseConfig ก็ได้)</label>
+          <input id="firebaseDbUrlInput" type="text" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-num text-xs" placeholder="เช่น https://my-shop-pos-default-rtdb.asia-southeast1.firebasedatabase.app" />
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-800 mb-1" for="firebaseStoreKeyInput">2. รหัสห้องข้อมูลร้านของคุณ (ตั้งเป็นชื่อภาษาอังกฤษสั้นๆ ให้ตรงกันทุกเครื่อง)</label>
+          <input id="firebaseStoreKeyInput" type="text" required value="naito_main_shop" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-num text-xs" placeholder="เช่น naito_main_shop" />
+        </div>
+
+        <div id="cloudShareLinkBox" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+          <div class="font-bold text-emerald-900">ลิงก์ด่วนสำหรับส่งให้มือถือ/คอมเครื่องอื่น (คลิกปุ๊บเชื่อมฐานข้อมูลเดียวกันอัตโนมัติ):</div>
+          <div class="flex gap-2">
+            <input id="cloudAutoConnectShareUrl" type="text" readonly class="flex-1 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-white font-num text-[11px] text-slate-700" />
+            <button type="button" onclick="copyCloudShareLink()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0">
+              คัดลอกลิงก์
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div class="flex gap-2">
+            <button type="button" onclick="pullStateFromCloudNow(true)" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">
+              🔄 ดึงข้อมูลล่าสุดจาก Cloud
+            </button>
+            <button type="button" onclick="disconnectCloudSync()" class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold">
+              ยกเลิกการเชื่อม
+            </button>
+          </div>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm">
+            บันทึก & ซิงค์ข้อมูลขึ้น Cloud ทันที
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Edit Shop Name Modal (Admin Only) -->
   <div id="shopNameModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 modal-animate-in">
@@ -1776,6 +1840,221 @@
     // 2. INITIAL APPLICATION STATE (WITH REALISTIC THAI SME DATA)
     // =========================================================================
     const STORAGE_KEY = 'siam_smart_pos_naito_prod_v1';
+    const CLOUD_CFG_KEY = 'siam_smart_pos_cloud_cfg_v1';
+    let cloudConfig = {
+      dbUrl: '',
+      roomKey: 'naito_main_shop',
+      lastUpdatedAt: 0
+    };
+    let cloudPollTimer = null;
+    let isSyncingFromCloud = false;
+
+    function normalizeFirebaseDbUrl(rawInput) {
+      if (!rawInput) return '';
+      const str = String(rawInput).trim();
+      // รองรับทั้งการวาง URL ตรงๆ และการวางโค้ด firebaseConfig ที่มี databaseURL: "https://..."
+      const match = str.match(/https:\/\/[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.(?:firebaseio\.com|firebasedatabase\.app)/);
+      if (match) return match[0].replace(/\/+$/, '');
+      if (str.startsWith('https://')) return str.replace(/\/+$/, '');
+      return '';
+    }
+
+    function updateCloudHeaderBadge() {
+      const btn = document.getElementById('cloudSyncHeaderBtn');
+      const txt = document.getElementById('cloudSyncHeaderStatusText');
+      const modalSt = document.getElementById('cloudModalCurrentStatus');
+      const shareBox = document.getElementById('cloudShareLinkBox');
+      const shareInp = document.getElementById('cloudAutoConnectShareUrl');
+
+      const connected = Boolean(cloudConfig.dbUrl);
+      if (txt) txt.textContent = connected ? '☁️ Cloud ออนไลน์' : 'เชื่อม Cloud ฟรี';
+      if (btn) {
+        btn.className = connected
+          ? 'px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition'
+          : 'px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-xs font-bold flex items-center gap-1.5 transition';
+      }
+      if (modalSt) {
+        modalSt.textContent = connected
+          ? `เชื่อมต่อออนไลน์แล้ว (${cloudConfig.dbUrl} / ห้อง: ${cloudConfig.roomKey})`
+          : 'ยังไม่ได้เชื่อมต่อ (เก็บข้อมูลในเครื่องนี้เท่านั้น)';
+        modalSt.className = connected ? 'text-emerald-700 font-bold' : 'text-amber-700 font-bold';
+      }
+      if (shareBox && shareInp) {
+        if (connected) {
+          shareBox.classList.remove('hidden');
+          const baseUrl = window.location.origin + window.location.pathname;
+          shareInp.value = `${baseUrl}?db=${encodeURIComponent(cloudConfig.dbUrl)}&room=${encodeURIComponent(cloudConfig.roomKey)}`;
+        } else {
+          shareBox.classList.add('hidden');
+        }
+      }
+    }
+
+    function openCloudSyncModal() {
+      document.getElementById('firebaseDbUrlInput').value = cloudConfig.dbUrl || '';
+      document.getElementById('firebaseStoreKeyInput').value = cloudConfig.roomKey || 'naito_main_shop';
+      updateCloudHeaderBadge();
+      openModal('cloudSyncModal');
+    }
+
+    function copyCloudShareLink() {
+      const inp = document.getElementById('cloudAutoConnectShareUrl');
+      if (!inp || !inp.value) return;
+      inp.select();
+      try {
+        document.execCommand('copy');
+        showToast('คัดลอกลิงก์สำหรับส่งให้เครื่องอื่นเรียบร้อยแล้ว!', 'success');
+      } catch (e) {
+        showToast('กรุณากดคัดลอกลิงก์จากช่องข้อความ', 'info');
+      }
+    }
+
+    async function pushStateToCloudNow() {
+      if (!cloudConfig.dbUrl || isSyncingFromCloud) return;
+      try {
+        const nowTs = Date.now();
+        cloudConfig.lastUpdatedAt = nowTs;
+        const payload = {
+          updatedAt: nowTs,
+          theme: state.theme,
+          shopName: state.shopName,
+          shopSubtitle: state.shopSubtitle,
+          vatEnabled: state.vatEnabled,
+          users: state.users,
+          products: state.products,
+          stockMovements: state.stockMovements,
+          sales: state.sales,
+          slips: state.slips,
+          historicalMonths: state.historicalMonths,
+          balanceSheets: state.balanceSheets,
+          auditLogs: state.auditLogs
+        };
+        const endpoint = `${cloudConfig.dbUrl}/siam_pos_rooms/${encodeURIComponent(cloudConfig.roomKey)}.json`;
+        const resp = await fetch(endpoint, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`);
+        }
+      } catch (err) {
+        // Fail gracefully if offline or permission rules not set to test mode
+      }
+    }
+
+    async function pullStateFromCloudNow(showFeedback = false) {
+      if (!cloudConfig.dbUrl) {
+        if (showFeedback) showToast('กรุณาวางลิงก์ Firebase Database URL ก่อนกดดึงข้อมูล', 'warning');
+        return;
+      }
+      try {
+        const endpoint = `${cloudConfig.dbUrl}/siam_pos_rooms/${encodeURIComponent(cloudConfig.roomKey)}.json`;
+        const resp = await fetch(endpoint);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const remote = await resp.json();
+        if (!remote) {
+          // ถ้าบน Cloud ยังว่างอยู่ ให้ส่งข้อมูลจากเครื่องนี้ขึ้นไปสร้างฐานข้อมูลทันที
+          await pushStateToCloudNow();
+          if (showFeedback) showToast('เชื่อมต่อสำเร็จ และอัปโหลดข้อมูลเริ่มต้นขึ้น Cloud เรียบร้อยแล้ว!', 'success');
+          return;
+        }
+        if (remote.updatedAt && remote.updatedAt > (cloudConfig.lastUpdatedAt || 0)) {
+          isSyncingFromCloud = true;
+          cloudConfig.lastUpdatedAt = remote.updatedAt;
+          if (remote.theme) state.theme = remote.theme;
+          if (remote.shopName) state.shopName = remote.shopName;
+          if (remote.shopSubtitle) state.shopSubtitle = remote.shopSubtitle;
+          state.vatEnabled = Boolean(remote.vatEnabled);
+          if (Array.isArray(remote.users) && remote.users.length > 0) state.users = remote.users;
+          state.products = Array.isArray(remote.products) ? remote.products : [];
+          state.stockMovements = Array.isArray(remote.stockMovements) ? remote.stockMovements : [];
+          state.sales = Array.isArray(remote.sales) ? remote.sales : [];
+          state.slips = Array.isArray(remote.slips) ? remote.slips : [];
+          if (remote.historicalMonths) state.historicalMonths = remote.historicalMonths;
+          if (remote.balanceSheets) state.balanceSheets = remote.balanceSheets;
+          state.auditLogs = Array.isArray(remote.auditLogs) ? remote.auditLogs : [];
+          saveStateToStorage();
+          refreshAllViews();
+          isSyncingFromCloud = false;
+          if (showFeedback) showToast('ดึงข้อมูลล่าสุดจาก Cloud เรียบร้อยแล้ว!', 'success');
+        } else if (showFeedback) {
+          showToast('ข้อมูลในเครื่องของคุณเป็นเวอร์ชันล่าสุดตรงกับ Cloud แล้ว', 'info');
+        }
+      } catch (err) {
+        isSyncingFromCloud = false;
+        if (showFeedback) {
+          showToast('ไม่สามารถเชื่อมลิงก์ Firebase ได้ กรุณาตรวจสอบว่าเปิดโหมด Test Mode (read/write: true) ใน Firebase แล้ว', 'error');
+        }
+      }
+    }
+
+    function startCloudPolling() {
+      if (cloudPollTimer) clearInterval(cloudPollTimer);
+      if (!cloudConfig.dbUrl) return;
+      cloudPollTimer = setInterval(() => {
+        pullStateFromCloudNow(false);
+      }, 6000);
+    }
+
+    async function handleSaveCloudSyncConfig(e) {
+      e.preventDefault();
+      const rawUrl = document.getElementById('firebaseDbUrlInput').value;
+      const cleanUrl = normalizeFirebaseDbUrl(rawUrl);
+      const roomKey = (document.getElementById('firebaseStoreKeyInput').value || 'naito_main_shop').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      if (!cleanUrl) {
+        showToast('รูปแบบลิงก์ไม่ถูกต้อง กรุณาวางลิงก์ที่ขึ้นต้นด้วย https://...firebasedatabase.app หรือ https://...firebaseio.com', 'error');
+        return;
+      }
+
+      cloudConfig.dbUrl = cleanUrl;
+      cloudConfig.roomKey = roomKey;
+      try {
+        localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cloudConfig));
+      } catch (err) {}
+
+      updateCloudHeaderBadge();
+      await pullStateFromCloudNow(true);
+      await pushStateToCloudNow();
+      startCloudPolling();
+    }
+
+    function disconnectCloudSync() {
+      if (cloudPollTimer) clearInterval(cloudPollTimer);
+      cloudConfig.dbUrl = '';
+      try {
+        localStorage.removeItem(CLOUD_CFG_KEY);
+      } catch (err) {}
+      updateCloudHeaderBadge();
+      showToast('ยกเลิกการเชื่อมต่อ Cloud แล้ว', 'info');
+    }
+
+    function initCloudConfigFromStorageOrUrl() {
+      try {
+        const saved = localStorage.getItem(CLOUD_CFG_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.dbUrl) {
+            cloudConfig.dbUrl = parsed.dbUrl;
+            cloudConfig.roomKey = parsed.roomKey || 'naito_main_shop';
+          }
+        }
+        const params = new URLSearchParams(window.location.search);
+        const urlDb = normalizeFirebaseDbUrl(params.get('db') || '');
+        const urlRoom = params.get('room');
+        if (urlDb) {
+          cloudConfig.dbUrl = urlDb;
+          if (urlRoom) cloudConfig.roomKey = urlRoom.replace(/[^a-zA-Z0-9_-]/g, '_');
+          localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cloudConfig));
+        }
+      } catch (err) {}
+      updateCloudHeaderBadge();
+      if (cloudConfig.dbUrl) {
+        pullStateFromCloudNow(false);
+        startCloudPolling();
+      }
+    }
 
     function createEmptyBalanceSheet() {
       return {
@@ -1869,6 +2148,9 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       } catch (err) {
         // Ignore storage errors in restricted environments
+      }
+      if (cloudConfig && cloudConfig.dbUrl && !isSyncingFromCloud) {
+        pushStateToCloudNow();
       }
     }
 
@@ -4469,6 +4751,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       loadStateFromStorage();
+      initCloudConfigFromStorageOrUrl();
       applyAppTheme(state.theme);
       renderShopBranding();
       document.getElementById('globalVatToggle').checked = state.vatEnabled;
